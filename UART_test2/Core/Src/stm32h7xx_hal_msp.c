@@ -202,20 +202,20 @@ void HAL_UART_MspInit(UART_HandleTypeDef* huart)
   /* USER CODE END USART1_MspInit 0 */
   /** Initializes the peripherals clock
   */
-    PeriphClkInitStruct.PeriphClockSelection = RCC_PERIPHCLK_USART1;
-    PeriphClkInitStruct.PLL3.PLL3M = 1;
-    PeriphClkInitStruct.PLL3.PLL3N = 24;
-    PeriphClkInitStruct.PLL3.PLL3P = 6;
-    PeriphClkInitStruct.PLL3.PLL3Q = 6;
-    PeriphClkInitStruct.PLL3.PLL3R = 6;
-    PeriphClkInitStruct.PLL3.PLL3RGE = RCC_PLL3VCIRANGE_2;
-    PeriphClkInitStruct.PLL3.PLL3VCOSEL = RCC_PLL3VCOWIDE;
-    PeriphClkInitStruct.PLL3.PLL3FRACN = 0;
-    PeriphClkInitStruct.Usart16ClockSelection = RCC_USART16CLKSOURCE_PLL3;
-    if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInitStruct) != HAL_OK)
-    {
-      Error_Handler();
-    }
+//    PeriphClkInitStruct.PeriphClockSelection = RCC_PERIPHCLK_USART1;
+//    PeriphClkInitStruct.PLL3.PLL3M = 1;
+//    PeriphClkInitStruct.PLL3.PLL3N = 40;
+//    PeriphClkInitStruct.PLL3.PLL3P = 6;
+//    PeriphClkInitStruct.PLL3.PLL3Q = 4;
+//    PeriphClkInitStruct.PLL3.PLL3R = 6;
+//    PeriphClkInitStruct.PLL3.PLL3RGE = RCC_PLL3VCIRANGE_2;
+//    PeriphClkInitStruct.PLL3.PLL3VCOSEL = RCC_PLL3VCOWIDE;
+//    PeriphClkInitStruct.PLL3.PLL3FRACN = 0;
+//    PeriphClkInitStruct.Usart16ClockSelection = RCC_USART16CLKSOURCE_PLL3;
+//    if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInitStruct) != HAL_OK)
+//    {
+//      Error_Handler();
+//    }
 
     /* Peripheral clock enable */
     __HAL_RCC_USART1_CLK_ENABLE();
@@ -268,9 +268,9 @@ void HAL_UART_MspInit(UART_HandleTypeDef* huart)
 	  RCC_PeriphCLKInitTypeDef usart3ClkInitStr = {0};
 	  usart3ClkInitStr.PeriphClockSelection = RCC_PERIPHCLK_USART234578;
 	  usart3ClkInitStr.PLL3.PLL3M = 1;
-	  usart3ClkInitStr.PLL3.PLL3N = 24;
+	  usart3ClkInitStr.PLL3.PLL3N = 60;
 	  usart3ClkInitStr.PLL3.PLL3P = 6;
-	  usart3ClkInitStr.PLL3.PLL3Q = 6;
+	  usart3ClkInitStr.PLL3.PLL3Q = 5;
 	  usart3ClkInitStr.PLL3.PLL3R = 6;
 	  usart3ClkInitStr.PLL3.PLL3RGE = RCC_PLL3VCIRANGE_2;
 	  usart3ClkInitStr.PLL3.PLL3VCOSEL = RCC_PLL3VCOWIDE;
@@ -295,7 +295,7 @@ void HAL_UART_MspInit(UART_HandleTypeDef* huart)
     GPIO_InitStruct.Pin = STLINK_RX_Pin|STLINK_TX_Pin;
     GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
     GPIO_InitStruct.Pull = GPIO_NOPULL;
-    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
     GPIO_InitStruct.Alternate = GPIO_AF7_USART3;
     HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
 
@@ -307,8 +307,8 @@ void HAL_UART_MspInit(UART_HandleTypeDef* huart)
     hdma_usart3_tx.Init.PeriphInc = DMA_PINC_DISABLE;
     hdma_usart3_tx.Init.MemInc = DMA_MINC_ENABLE;
     hdma_usart3_tx.Init.PeriphDataAlignment = DMA_PDATAALIGN_BYTE;
-    hdma_usart3_tx.Init.MemDataAlignment = DMA_MDATAALIGN_BYTE;
-    hdma_usart3_tx.Init.Mode = DMA_NORMAL;
+    hdma_usart3_tx.Init.MemDataAlignment = DMA_MDATAALIGN_HALFWORD;
+    hdma_usart3_tx.Init.Mode = DMA_CIRCULAR;
     hdma_usart3_tx.Init.Priority = DMA_PRIORITY_LOW;
     hdma_usart3_tx.Init.FIFOMode = DMA_FIFOMODE_DISABLE;
     if (HAL_DMA_Init(&hdma_usart3_tx) != HAL_OK)

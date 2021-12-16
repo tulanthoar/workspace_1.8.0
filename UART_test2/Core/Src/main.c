@@ -84,6 +84,7 @@ PCD_HandleTypeDef hpcd_USB_OTG_FS;
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_USART3_UART_Init(void);
+static void MX_USART3_UART_Init_bad(void);
 static void MX_SPI2_Init(void);
 static void MX_DMA_Init(void);
 static void MX_USART1_UART_Init(void);
@@ -95,7 +96,7 @@ static void MX_USART1_UART_Init(void);
 /* USER CODE BEGIN 0 */
 __IO ITStatus UartReady = RESET;
 __IO uint32_t UserButtonStatus = 0;  /* set to 1 after User Button interrupt  */
-ALIGN_32BYTES (uint8_t aTxBuffer[160]) = " *****UART_TwoBoards communication based on DMA***** ";
+ALIGN_32BYTES (uint16_t aTxBuffer[16384]) = {0};
 /* USER CODE END 0 */
 
 /**
@@ -105,7 +106,9 @@ ALIGN_32BYTES (uint8_t aTxBuffer[160]) = " *****UART_TwoBoards communication bas
 int main(void)
 {
   /* USER CODE BEGIN 1 */
-
+  for( int i = 0; i < COUNTOF(aTxBuffer); ++i ){
+	  aTxBuffer[i] = i % 16384;
+  }
   /* USER CODE END 1 */
 
   /* Enable I-Cache---------------------------------------------------------*/
@@ -146,16 +149,35 @@ int main(void)
   BSP_PB_Init(BUTTON_USER, BUTTON_MODE_EXTI);
   while(UserButtonStatus == 0)
   {
-    /* Toggle LED1*/
     BSP_LED_Toggle(LED1);
     HAL_Delay(100);
   }
   UserButtonStatus = 0;
-  if(HAL_UART_Transmit(&huart3, (uint8_t*)aTxBuffer, TXBUFFERSIZE, 5000)!= HAL_OK)
+  uint32_t tickstart = HAL_GetTick();
+  for(int i = 0; i < COUNTOF(aTxBuffer); ++i){
+      if (UART_WaitOnFlagUntilTimeout(&huart3, UART_FLAG_TXE, RESET, tickstart, 50000) != HAL_OK)
+      {
+        return HAL_TIMEOUT;
+      }
+      huart3.Instance->TDR = aTxBuffer[i] & 0xFFU;
+      if (UART_WaitOnFlagUntilTimeout(&huart3, UART_FLAG_TXE, RESET, tickstart, 50000) != HAL_OK)
+      {
+        return HAL_TIMEOUT;
+      }
+      huart3.Instance->TDR = (aTxBuffer[i] & 0xFF00U)>>8;
+  }
+  if (UART_WaitOnFlagUntilTimeout(&huart3, UART_FLAG_TC, RESET, tickstart, 50000) != HAL_OK)
   {
-    Error_Handler();
+    return HAL_TIMEOUT;
   }
   BSP_LED_Off(LED1);
+  while(UserButtonStatus == 0)
+  {
+    /* Toggle LED1*/
+    BSP_LED_Toggle(LED2);
+    HAL_Delay(100);
+  }
+  UserButtonStatus = 0;
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -168,16 +190,17 @@ int main(void)
 	  /*##-2- Start the transmission process #####################################*/
 	  /* While the UART in reception process, user can transmit data through
 	     "aTxBuffer" buffer */
-	  if(HAL_UART_Transmit_DMA(&huart3, (uint8_t*)aTxBuffer, TXBUFFERSIZE)!= HAL_OK)
+	  if(HAL_UART_Transmit_DMA(&huart3, (uint8_t*)aTxBuffer, 2 * COUNTOF(aTxBuffer))!= HAL_OK)
 	  {
 	    Error_Handler();
 	  }
 	  /*##-3- Wait for the end of the transfer ###################################*/
-	  while ((UartReady == RESET) && (UserButtonStatus == 0))
+	  while ((UartReady == RESET) || (UserButtonStatus == 0))
 	  {
 		    BSP_LED_Toggle(LED1);
 		    HAL_Delay(100);
 	  }
+	  UartReady = RESET;
 	  UserButtonStatus = 0;
     /* USER CODE BEGIN 3 */
   }
@@ -311,13 +334,13 @@ static void MX_USART1_UART_Init(void)
 
   /* USER CODE END USART1_Init 1 */
   huart1.Instance = USART1;
-  huart1.Init.BaudRate = 2000000;
-  huart1.Init.WordLength = UART_WORDLENGTH_8B;
+  huart1.Init.BaudRate = 12000000;
+  huart1.Init.WordLength = UART_WORDLENGTH_9B;
   huart1.Init.StopBits = UART_STOPBITS_1;
-  huart1.Init.Parity = UART_PARITY_NONE;
+  huart1.Init.Parity = UART_PARITY_ODD;
   huart1.Init.Mode = UART_MODE_TX_RX;
   huart1.Init.HwFlowCtl = UART_HWCONTROL_NONE;
-  huart1.Init.OverSampling = UART_OVERSAMPLING_16;
+  huart1.Init.OverSampling = UART_OVERSAMPLING_8;
   huart1.Init.OneBitSampling = UART_ONE_BIT_SAMPLE_DISABLE;
   huart1.Init.ClockPrescaler = UART_PRESCALER_DIV1;
   huart1.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_NO_INIT;
@@ -343,6 +366,49 @@ static void MX_USART1_UART_Init(void)
 
 }
 
+static void MX_USART3_UART_Init_bad(void)
+{
+  /* USER CODE BEGIN USART3_Init 0 */
+
+  /* USER CODE END USART3_Init 0 */
+
+  /* USER CODE BEGIN USART3_Init 1 */
+
+  /* USER CODE END USART3_Init 1 */
+  huart3.Instance = USART3;
+  huart3.Init.BaudRate = 12000000;
+  huart3.Init.WordLength = UART_WORDLENGTH_9B;
+  huart3.Init.StopBits = UART_STOPBITS_1;
+  huart3.Init.Parity = UART_PARITY_ODD;
+  huart3.Init.Mode = UART_MODE_TX_RX;
+  huart3.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+  huart3.Init.OverSampling = UART_OVERSAMPLING_8;
+  huart3.Init.OneBitSampling = UART_ONE_BIT_SAMPLE_DISABLE;
+  huart3.Init.ClockPrescaler = UART_PRESCALER_DIV1;
+  huart3.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_MSBFIRST_INIT;
+  huart3.AdvancedInit.MSBFirst = UART_ADVFEATURE_MSBFIRST_DISABLE;
+  if (HAL_UART_Init(&huart3) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_UARTEx_SetTxFifoThreshold(&huart3, UART_TXFIFO_THRESHOLD_1_8) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_UARTEx_SetRxFifoThreshold(&huart3, UART_RXFIFO_THRESHOLD_1_8) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_UARTEx_EnableFifoMode(&huart3) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN USART3_Init 2 */
+
+  /* USER CODE END USART3_Init 2 */
+  HAL_NVIC_SetPriority(USART3_IRQn, 0, 1);
+  HAL_NVIC_EnableIRQ(USART3_IRQn);
+}
 /**
   * @brief USART3 Initialization Function
   * @param None
@@ -358,16 +424,17 @@ static void MX_USART3_UART_Init(void)
 
   /* USER CODE END USART3_Init 1 */
   huart3.Instance = USART3;
-  huart3.Init.BaudRate = 2000000;
-  huart3.Init.WordLength = UART_WORDLENGTH_8B;
+  huart3.Init.BaudRate = 12000000;
+  huart3.Init.WordLength = UART_WORDLENGTH_9B;
   huart3.Init.StopBits = UART_STOPBITS_1;
-  huart3.Init.Parity = UART_PARITY_NONE;
+  huart3.Init.Parity = UART_PARITY_EVEN;
   huart3.Init.Mode = UART_MODE_TX_RX;
   huart3.Init.HwFlowCtl = UART_HWCONTROL_NONE;
-  huart3.Init.OverSampling = UART_OVERSAMPLING_16;
+  huart3.Init.OverSampling = UART_OVERSAMPLING_8;
   huart3.Init.OneBitSampling = UART_ONE_BIT_SAMPLE_DISABLE;
   huart3.Init.ClockPrescaler = UART_PRESCALER_DIV1;
-  huart3.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_NO_INIT;
+  huart3.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_MSBFIRST_INIT;
+  huart3.AdvancedInit.MSBFirst = UART_ADVFEATURE_MSBFIRST_DISABLE;
   if (HAL_UART_Init(&huart3) != HAL_OK)
   {
     Error_Handler();
@@ -468,7 +535,7 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 void HAL_UART_TxCpltCallback(UART_HandleTypeDef *UartHandle)
 {
   /* Set transmission flag: transfer complete */
-//  UartReady = SET;
+  UartReady = SET;
   /* Turn LED2 off: Transfer in transmission process is correct */
   BSP_LED_On(LED2);
 
