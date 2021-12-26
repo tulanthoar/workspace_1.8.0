@@ -39,35 +39,10 @@
 
 /* USER CODE END PM */
 
-/* Private variables ---------------------------------------------------------*/
-#if defined ( __ICCARM__ ) /*!< IAR Compiler */
-
-#pragma location=0x30040000
-ETH_DMADescTypeDef  DMARxDscrTab[ETH_RX_DESC_CNT]; /* Ethernet Rx DMA Descriptors */
-#pragma location=0x30040060
-ETH_DMADescTypeDef  DMATxDscrTab[ETH_TX_DESC_CNT]; /* Ethernet Tx DMA Descriptors */
-#pragma location=0x300400c0
-uint8_t Rx_Buff[ETH_RX_DESC_CNT][ETH_MAX_PACKET_SIZE]; /* Ethernet Receive Buffers */
-
-#elif defined ( __CC_ARM )  /* MDK ARM Compiler */
-
-__attribute__((at(0x30040000))) ETH_DMADescTypeDef  DMARxDscrTab[ETH_RX_DESC_CNT]; /* Ethernet Rx DMA Descriptors */
-__attribute__((at(0x30040060))) ETH_DMADescTypeDef  DMATxDscrTab[ETH_TX_DESC_CNT]; /* Ethernet Tx DMA Descriptors */
-__attribute__((at(0x300400c0))) uint8_t Rx_Buff[ETH_RX_DESC_CNT][ETH_MAX_PACKET_SIZE]; /* Ethernet Receive Buffer */
-
-#elif defined ( __GNUC__ ) /* GNU Compiler */
-
-ETH_DMADescTypeDef DMARxDscrTab[ETH_RX_DESC_CNT] __attribute__((section(".RxDecripSection"))); /* Ethernet Rx DMA Descriptors */
-ETH_DMADescTypeDef DMATxDscrTab[ETH_TX_DESC_CNT] __attribute__((section(".TxDecripSection")));   /* Ethernet Tx DMA Descriptors */
-uint8_t Rx_Buff[ETH_RX_DESC_CNT][ETH_MAX_PACKET_SIZE] __attribute__((section(".RxArraySection"))); /* Ethernet Receive Buffers */
-
-#endif
-
-ETH_TxPacketConfig TxConfig;
-
-ETH_HandleTypeDef heth;
 
 SPI_HandleTypeDef hspi2;
+SPI_HandleTypeDef hspi1;
+DMA_HandleTypeDef hdma_spi1_rx;
 
 UART_HandleTypeDef huart1;
 UART_HandleTypeDef huart3;
@@ -84,19 +59,27 @@ PCD_HandleTypeDef hpcd_USB_OTG_FS;
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_USART3_UART_Init(void);
-static void MX_USART3_UART_Init_bad(void);
 static void MX_SPI2_Init(void);
+static void MX_SPI1_Init(void);
 static void MX_DMA_Init(void);
 static void MX_USART1_UART_Init(void);
+static void tx_complete(DMA_HandleTypeDef *hdma);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
-
+enum {
+  TRANSFER_WAIT,
+  TRANSFER_COMPLETE,
+  TRANSFER_ERROR
+};
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 __IO ITStatus UartReady = RESET;
 __IO uint32_t UserButtonStatus = 0;  /* set to 1 after User Button interrupt  */
-ALIGN_32BYTES (uint16_t aTxBuffer[16384]) = {0};
+ALIGN_32BYTES (uint16_t aTxBuffer[2048]) = {0};
+ALIGN_32BYTES (uint16_t aRxBuffer0[2048]) = {0};
+ALIGN_32BYTES (uint16_t aRxBuffer1[2048]) = {0};
+__IO uint32_t wTransferState = TRANSFER_WAIT;
 /* USER CODE END 0 */
 
 /**
@@ -135,12 +118,12 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
+  HAL_EnableCompensationCell();
   MX_DMA_Init();
-//  MX_ETH_Init();
   MX_USART3_UART_Init();
-//  MX_USB_OTG_FS_PCD_Init();
-//  MX_SPI2_Init();
-//  MX_USART1_UART_Init();
+  MX_SPI2_Init();
+  MX_SPI1_Init();
+  MX_USART1_UART_Init();
   /* USER CODE BEGIN 2 */
   /* Configure User push-button in Interrupt mode */
   BSP_LED_Init(LED1);
@@ -178,30 +161,136 @@ int main(void)
     HAL_Delay(100);
   }
   UserButtonStatus = 0;
-  /* USER CODE END 2 */
 
+  UartReady = RESET;
+  BSP_LED_Off(LED1);
+  BSP_LED_Off(LED2);
+    /* Process Locked */
+    __HAL_LOCK(&hspi1);
+
+    if (hspi1.State != HAL_SPI_STATE_READY)
+    {
+      __HAL_UNLOCK(&hspi1);
+      Error_Handler();
+    }
+
+
+    /* Set the transaction information */
+    hspi1.State       = HAL_SPI_STATE_BUSY_RX;
+    hspi1.ErrorCode   = HAL_SPI_ERROR_NONE;
+    hspi1.pRxBuffPtr  = (uint8_t *)aTxBuffer;
+    hspi1.RxXferSize  = sizeof(aTxBuffer)/2;
+    hspi1.RxXferCount = sizeof(aTxBuffer)/2;
+
+    /*Init field not used in handle to zero */
+    hspi1.RxISR       = NULL;
+    hspi1.TxISR       = NULL;
+    hspi1.TxXferSize  = (uint16_t) 0UL;
+    hspi1.TxXferCount = (uint16_t) 0UL;
+
+    /* Configure communication direction : 1Line */
+    if (hspi1.Init.Direction == SPI_DIRECTION_1LINE)
+    {
+      SPI_1LINE_RX(&hspi1);
+    }
+
+    /* Packing mode management is enabled by the DMA settings */
+    if (((hspi1.Init.DataSize > SPI_DATASIZE_16BIT) && (hspi1.hdmarx->Init.MemDataAlignment != DMA_MDATAALIGN_WORD))    || \
+        ((hspi1.Init.DataSize > SPI_DATASIZE_8BIT) && ((hspi1.hdmarx->Init.MemDataAlignment != DMA_MDATAALIGN_HALFWORD) && \
+                                                       (hspi1.hdmarx->Init.MemDataAlignment != DMA_MDATAALIGN_WORD))))
+    {
+      /* Restriction the DMA data received is not allowed in this mode */
+
+      __HAL_UNLOCK(&hspi1);
+      Error_Handler();
+    }
+
+    /* Clear RXDMAEN bit */
+    CLEAR_BIT(hspi1.Instance->CFG1, SPI_CFG1_RXDMAEN);
+
+
+    /* Set the SPI RxDMA Half transfer complete callback */
+    hspi1.hdmarx->XferHalfCpltCallback = NULL;
+
+    /* Set the SPI Rx DMA transfer complete callback */
+    hspi1.hdmarx->XferCpltCallback = tx_complete;
+
+    /* Set the DMA error callback */
+    hspi1.hdmarx->XferErrorCallback = NULL;
+
+    /* Set the DMA AbortCpltCallback */
+    hspi1.hdmarx->XferAbortCallback = NULL;
+    MODIFY_REG(((DMA_Stream_TypeDef   *)hdma_spi1_rx.Instance)->CR, (DMA_IT_TC), (DMA_IT_TC));
+    /* Enable the Rx DMA Stream/Channel  */
+    if (HAL_OK != HAL_DMA_Start(hspi1.hdmarx, (uint32_t)&hspi1.Instance->RXDR, (uint32_t)hspi1.pRxBuffPtr, hspi1.RxXferCount))
+    {
+      /* Update SPI error code */
+      SET_BIT(hspi1.ErrorCode, HAL_SPI_ERROR_DMA);
+      hspi1.State = HAL_SPI_STATE_READY;
+      Error_Handler();
+    }
+
+    /* Set the number of data at current transfer */
+    if (hspi1.hdmarx->Init.Mode == DMA_CIRCULAR)
+    {
+      MODIFY_REG(hspi1.Instance->CR2, SPI_CR2_TSIZE, 0UL);
+    }
+    else
+    {
+      MODIFY_REG(hspi1.Instance->CR2, SPI_CR2_TSIZE, sizeof(aTxBuffer)/2);
+    }
+
+    /* Enable Rx DMA Request */
+    SET_BIT(hspi1.Instance->CFG1, SPI_CFG1_RXDMAEN);
+
+    /* Enable the SPI Error Interrupt Bit */
+    __HAL_SPI_ENABLE_IT(&hspi1, (SPI_IT_OVR | SPI_IT_FRE | SPI_IT_MODF));
+
+    /* Enable SPI peripheral */
+    __HAL_SPI_ENABLE(&hspi1);
+
+    if (hspi1.Init.Mode == SPI_MODE_MASTER)
+    {
+      /* Master transfer start */
+      SET_BIT(hspi1.Instance->CR1, SPI_CR1_CSTART);
+    }
+  while (wTransferState == TRANSFER_WAIT)
+  {
+	    BSP_LED_Toggle(LED3);
+	    HAL_Delay(100);
+  }
+  wTransferState = TRANSFER_WAIT;
+
+  UserButtonStatus = 0;
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-	  UartReady = RESET;
-//	  BSP_LED_On(LED2);
+
     /* USER CODE END WHILE */
 	  /*##-2- Start the transmission process #####################################*/
-	  /* While the UART in reception process, user can transmit data through
-	     "aTxBuffer" buffer */
-	  if(HAL_UART_Transmit_DMA(&huart3, (uint8_t*)aTxBuffer, 2 * COUNTOF(aTxBuffer))!= HAL_OK)
+	  if(HAL_UART_Transmit_DMA(&huart3, (uint8_t*)aTxBuffer, sizeof(aTxBuffer))!= HAL_OK)
 	  {
 	    Error_Handler();
 	  }
 	  /*##-3- Wait for the end of the transfer ###################################*/
-	  while ((UartReady == RESET) || (UserButtonStatus == 0))
+
+
+
+	  UserButtonStatus = 0;
+	  HAL_Delay(17);
+	  while ((UartReady == RESET))
 	  {
 		    BSP_LED_Toggle(LED1);
-		    HAL_Delay(100);
+//		    HAL_Delay(100);
 	  }
 	  UartReady = RESET;
-	  UserButtonStatus = 0;
+	  while (wTransferState == TRANSFER_WAIT)
+	  {
+		    BSP_LED_Toggle(LED3);
+//		    HAL_Delay(100);
+	  }
+	  wTransferState = TRANSFER_WAIT;
     /* USER CODE BEGIN 3 */
   }
   /* USER CODE END 3 */
@@ -268,7 +357,48 @@ void SystemClock_Config(void)
 
 }
 
+static void MX_SPI1_Init(void)
+{
 
+  /* USER CODE BEGIN SPI1_Init 0 */
+
+  /* USER CODE END SPI1_Init 0 */
+
+  /* USER CODE BEGIN SPI1_Init 1 */
+
+  /* USER CODE END SPI1_Init 1 */
+  /* SPI1 parameter configuration*/
+  hspi1.Instance = SPI1;
+  hspi1.Init.Mode = SPI_MODE_MASTER;
+  hspi1.Init.Direction = SPI_DIRECTION_2LINES_RXONLY;
+  hspi1.Init.DataSize = SPI_DATASIZE_14BIT;
+  hspi1.Init.CLKPolarity = SPI_POLARITY_HIGH;
+  hspi1.Init.CLKPhase = SPI_PHASE_1EDGE;
+  hspi1.Init.NSS = SPI_NSS_HARD_OUTPUT;
+  hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_2;
+  hspi1.Init.FirstBit = SPI_FIRSTBIT_MSB;
+  hspi1.Init.TIMode = SPI_TIMODE_DISABLE;
+  hspi1.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
+  hspi1.Init.CRCPolynomial = 0x0;
+  hspi1.Init.NSSPMode = SPI_NSS_PULSE_ENABLE;
+  hspi1.Init.NSSPolarity = SPI_NSS_POLARITY_LOW;
+  hspi1.Init.FifoThreshold = SPI_FIFO_THRESHOLD_01DATA;
+  hspi1.Init.TxCRCInitializationPattern = SPI_CRC_INITIALIZATION_ALL_ZERO_PATTERN;
+  hspi1.Init.RxCRCInitializationPattern = SPI_CRC_INITIALIZATION_ALL_ZERO_PATTERN;
+  hspi1.Init.MasterSSIdleness = SPI_MASTER_SS_IDLENESS_00CYCLE;
+  hspi1.Init.MasterInterDataIdleness = SPI_MASTER_INTERDATA_IDLENESS_02CYCLE;
+  hspi1.Init.MasterReceiverAutoSusp = SPI_MASTER_RX_AUTOSUSP_DISABLE;
+  hspi1.Init.MasterKeepIOState = SPI_MASTER_KEEP_IO_STATE_DISABLE;
+  hspi1.Init.IOSwap = SPI_IO_SWAP_DISABLE;
+  if (HAL_SPI_Init(&hspi1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN SPI1_Init 2 */
+
+  /* USER CODE END SPI1_Init 2 */
+
+}
 
 /**
   * @brief SPI2 Initialization Function
@@ -289,7 +419,7 @@ static void MX_SPI2_Init(void)
   hspi2.Instance = SPI2;
   hspi2.Init.Mode = SPI_MODE_MASTER;
   hspi2.Init.Direction = SPI_DIRECTION_2LINES;
-  hspi2.Init.DataSize = SPI_DATASIZE_4BIT;
+  hspi2.Init.DataSize = SPI_DATASIZE_16BIT;
   hspi2.Init.CLKPolarity = SPI_POLARITY_LOW;
   hspi2.Init.CLKPhase = SPI_PHASE_1EDGE;
   hspi2.Init.NSS = SPI_NSS_HARD_OUTPUT;
@@ -366,49 +496,6 @@ static void MX_USART1_UART_Init(void)
 
 }
 
-static void MX_USART3_UART_Init_bad(void)
-{
-  /* USER CODE BEGIN USART3_Init 0 */
-
-  /* USER CODE END USART3_Init 0 */
-
-  /* USER CODE BEGIN USART3_Init 1 */
-
-  /* USER CODE END USART3_Init 1 */
-  huart3.Instance = USART3;
-  huart3.Init.BaudRate = 12000000;
-  huart3.Init.WordLength = UART_WORDLENGTH_9B;
-  huart3.Init.StopBits = UART_STOPBITS_1;
-  huart3.Init.Parity = UART_PARITY_ODD;
-  huart3.Init.Mode = UART_MODE_TX_RX;
-  huart3.Init.HwFlowCtl = UART_HWCONTROL_NONE;
-  huart3.Init.OverSampling = UART_OVERSAMPLING_8;
-  huart3.Init.OneBitSampling = UART_ONE_BIT_SAMPLE_DISABLE;
-  huart3.Init.ClockPrescaler = UART_PRESCALER_DIV1;
-  huart3.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_MSBFIRST_INIT;
-  huart3.AdvancedInit.MSBFirst = UART_ADVFEATURE_MSBFIRST_DISABLE;
-  if (HAL_UART_Init(&huart3) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  if (HAL_UARTEx_SetTxFifoThreshold(&huart3, UART_TXFIFO_THRESHOLD_1_8) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  if (HAL_UARTEx_SetRxFifoThreshold(&huart3, UART_RXFIFO_THRESHOLD_1_8) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  if (HAL_UARTEx_EnableFifoMode(&huart3) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /* USER CODE BEGIN USART3_Init 2 */
-
-  /* USER CODE END USART3_Init 2 */
-  HAL_NVIC_SetPriority(USART3_IRQn, 0, 1);
-  HAL_NVIC_EnableIRQ(USART3_IRQn);
-}
 /**
   * @brief USART3 Initialization Function
   * @param None
@@ -466,6 +553,7 @@ static void MX_DMA_Init(void)
 
   /* DMA controller clock enable */
   __HAL_RCC_DMA1_CLK_ENABLE();
+  __HAL_RCC_DMA2_CLK_ENABLE();
 
   /* DMA interrupt init */
   /* DMA1_Stream0_IRQn interrupt configuration */
@@ -474,6 +562,9 @@ static void MX_DMA_Init(void)
   /* DMA1_Stream1_IRQn interrupt configuration */
   HAL_NVIC_SetPriority(DMA1_Stream1_IRQn, 0, 1);
   HAL_NVIC_EnableIRQ(DMA1_Stream1_IRQn);
+  /* DMA1_Stream2_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA2_Stream0_IRQn, 0, 1);
+  HAL_NVIC_EnableIRQ(DMA2_Stream0_IRQn);
 
 }
 
@@ -528,8 +619,33 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
   if(GPIO_Pin == BUTTON_USER_PIN)
   {
     UserButtonStatus ^= 1;
-//    BSP_LED_Toggle(LED2);
   }
+}
+
+void HAL_SPI_RxCpltCallback(SPI_HandleTypeDef *hspi)
+{
+  /* Turn LED1 on: Transfer in transmission process is complete */
+  BSP_LED_On(LED1);
+  wTransferState = TRANSFER_COMPLETE;
+}
+
+void tx_complete(DMA_HandleTypeDef *hdma)
+{
+	  /* Turn LED1 on: Transfer in transmission process is complete */
+	  BSP_LED_On(LED1);
+	  wTransferState = TRANSFER_COMPLETE;
+}
+
+/**
+  * @brief  SPI error callbacks.
+  * @param  hspi: SPI handle
+  * @note   This example shows a simple way to report transfer error, and you can
+  *         add your own implementation.
+  * @retval None
+  */
+void HAL_SPI_ErrorCallback(SPI_HandleTypeDef *hspi)
+{
+  wTransferState = TRANSFER_ERROR;
 }
 
 void HAL_UART_TxCpltCallback(UART_HandleTypeDef *UartHandle)

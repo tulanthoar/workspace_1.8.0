@@ -58,6 +58,9 @@
 extern DMA_HandleTypeDef hdma_usart1_tx;
 extern DMA_HandleTypeDef hdma_usart3_tx;
 extern UART_HandleTypeDef huart3;
+extern DMA_HandleTypeDef hdma_spi1_rx;;
+extern SPI_HandleTypeDef hspi1;
+extern uint32_t wTransferState;
 /* USER CODE BEGIN EV */
 
 /* USER CODE END EV */
@@ -229,6 +232,17 @@ void DMA1_Stream1_IRQHandler(void)
   /* USER CODE END DMA1_Stream1_IRQn 1 */
 }
 
+void DMA2_Stream0_IRQHandler(void)
+{
+  /* USER CODE BEGIN DMA1_Stream0_IRQn 0 */
+	  BSP_LED_On(LED1);
+  /* USER CODE END DMA1_Stream0_IRQn 0 */
+  HAL_DMA_IRQHandler(&hdma_spi1_rx);
+  /* USER CODE BEGIN DMA1_Stream0_IRQn 1 */
+
+  /* USER CODE END DMA1_Stream0_IRQn 1 */
+}
+
 void EXTI15_10_IRQHandler(void)
 {
   HAL_GPIO_EXTI_IRQHandler(BUTTON_USER_PIN);
@@ -238,6 +252,12 @@ void USART3_IRQHandler(void)
 {
 	BSP_LED_On(LED2);
   HAL_UART_IRQHandler(&huart3);
+}
+
+void SPI1_IRQHandler(void)
+{
+  HAL_SPI_IRQHandler(&hspi1);
+  BSP_LED_On(LED2);
 }
 
 /* USER CODE BEGIN 1 */
