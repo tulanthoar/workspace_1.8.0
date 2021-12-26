@@ -100,7 +100,7 @@ void HAL_SPI_MspInit(SPI_HandleTypeDef* hspi)
       PeriphClkInitStruct.Spi123ClockSelection = RCC_SPI123CLKSOURCE_PLL3;
       PeriphClkInitStruct.PLL3.PLL3M = 1;
       PeriphClkInitStruct.PLL3.PLL3N = 60;
-      PeriphClkInitStruct.PLL3.PLL3P = 128;
+      PeriphClkInitStruct.PLL3.PLL3P = 32;
       PeriphClkInitStruct.PLL3.PLL3Q = 5;
       PeriphClkInitStruct.PLL3.PLL3R = 6;
       PeriphClkInitStruct.PLL3.PLL3RGE = RCC_PLL3VCIRANGE_2;
@@ -337,7 +337,7 @@ void HAL_UART_MspInit(UART_HandleTypeDef* huart)
 	  usart3ClkInitStr.PeriphClockSelection = RCC_PERIPHCLK_USART234578;
 	  usart3ClkInitStr.PLL3.PLL3M = 1;
 	  usart3ClkInitStr.PLL3.PLL3N = 60;
-	  usart3ClkInitStr.PLL3.PLL3P = 128;
+	  usart3ClkInitStr.PLL3.PLL3P = 32;
 	  usart3ClkInitStr.PLL3.PLL3Q = 5;
 	  usart3ClkInitStr.PLL3.PLL3R = 6;
 	  usart3ClkInitStr.PLL3.PLL3RGE = RCC_PLL3VCIRANGE_2;
