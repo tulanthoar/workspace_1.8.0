@@ -58,11 +58,11 @@ PCD_HandleTypeDef hpcd_USB_OTG_FS;
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
-static void MX_USART3_UART_Init(void);
-//static void MX_SPI2_Init(void);
-static void MX_SPI1_Init(void);
-static void MX_DMA_Init(void);
 //static void MX_USART1_UART_Init(void);
+static void MX_USART3_UART_Init(void);
+static void MX_SPI1_Init(void);
+//static void MX_SPI2_Init(void);
+static void MX_DMA_Init(void);
 static void tx_complete(DMA_HandleTypeDef *hdma);
 static void tx_h_complete(DMA_HandleTypeDef *hdma);
 /* USER CODE BEGIN PFP */
@@ -78,8 +78,8 @@ enum {
 /* USER CODE BEGIN 0 */
 __IO ITStatus UartReady = RESET;
 __IO uint32_t UserButtonStatus = 0;  /* set to 1 after User Button interrupt  */
-ALIGN_32BYTES (uint16_t aTxBuffer[2048]) = {0};
-ALIGN_32BYTES (uint16_t aRxBuffer[4096]) = {0};
+ALIGN_32BYTES (uint16_t aTxBuffer[1024]) = {0};
+ALIGN_32BYTES (uint16_t aRxBuffer[10240]) = {0};
 __IO uint32_t wTransferState = TRANSFER_WAIT;
 /* USER CODE END 0 */
 
@@ -90,6 +90,7 @@ __IO uint32_t wTransferState = TRANSFER_WAIT;
 int main(void)
 {
 	unsigned short rxCount = COUNTOF(aRxBuffer);
+	unsigned short rxOffset = rxCount / 2;
 	unsigned short txCount = COUNTOF(aTxBuffer);
   /* USER CODE BEGIN 1 */
   for( int i = 0; i < txCount; ++i ){
@@ -121,10 +122,10 @@ int main(void)
   MX_GPIO_Init();
   HAL_EnableCompensationCell();
   MX_DMA_Init();
+  //  MX_USART1_UART_Init();
   MX_USART3_UART_Init();
-//  MX_USART1_UART_Init();
-//  MX_SPI2_Init();
   MX_SPI1_Init();
+//  MX_SPI2_Init();
   /* USER CODE BEGIN 2 */
   /* Configure User push-button in Interrupt mode */
 
@@ -205,8 +206,9 @@ int main(void)
 	    BSP_LED_Toggle(LED3);
   }
   wTransferState = TRANSFER_WAIT;
-  for( int i = 0; i < txCount; ++i ){
-	  aTxBuffer[i] = aRxBuffer[i];
+  int j = 0;
+  for( int i = 0; i < txCount; ++i, j += 5 ){
+	  aTxBuffer[i] = aRxBuffer[j];
   }
   if(HAL_UART_Transmit_DMA(&huart3, (uint8_t*)aTxBuffer, sizeof(aTxBuffer))!= HAL_OK)
   {
@@ -218,8 +220,9 @@ int main(void)
   {
 	  while (wTransferState != TRANSFER_COMPLETE) {}
 	  wTransferState = TRANSFER_WAIT;
-	  for( int i = 0; i < txCount; ++i ){
-		  aTxBuffer[i] = aRxBuffer[i + txCount];
+	  j = rxOffset;
+	  for( int i = 0; i < txCount; ++i, j+=5 ){
+		  aTxBuffer[i] = aRxBuffer[j];
 	  }
 	  while ((UartReady == RESET)) {}
 	  UartReady = RESET;
@@ -230,9 +233,11 @@ int main(void)
 	  }
 	  while (wTransferState != TRANSFER_H_COMPLETE) {}
 	  wTransferState = TRANSFER_WAIT;
-	  for( int i = 0; i < txCount; ++i ){
-		  aTxBuffer[i] = aRxBuffer[i];
+	  j = 0;
+	  for( int i = 0; i < txCount; ++i, j+=5 ){
+		  aTxBuffer[i] = aRxBuffer[j];
 	  }
+
 	  while ((UartReady == RESET)) {}
 	  UartReady = RESET;
 	  /*##-2- Start the transmission process #####################################*/

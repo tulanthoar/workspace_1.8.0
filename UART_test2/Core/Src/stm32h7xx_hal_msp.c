@@ -29,9 +29,14 @@ extern DMA_HandleTypeDef hdma_usart3_tx;
 extern DMA_HandleTypeDef hdma_spi1_rx;
 const unsigned short pll3_m = 4;
 const unsigned short pll3_n = 368;
-const unsigned short pll3_p = 50;
+const unsigned short pll3_p = 9;
 const unsigned short pll3_q = 8;
 const unsigned short pll3_r = 2;
+const unsigned short pll2_m = 4;
+const unsigned short pll2_n = 360;
+const unsigned short pll2_p = 8;
+const unsigned short pll2_q = 2;
+const unsigned short pll2_r = 2;
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN TD */
@@ -102,15 +107,15 @@ void HAL_SPI_MspInit(SPI_HandleTypeDef* hspi)
     /** Initializes the peripherals clock
     */
       PeriphClkInitStruct.PeriphClockSelection = RCC_PERIPHCLK_SPI1;
-      PeriphClkInitStruct.Spi123ClockSelection = RCC_SPI123CLKSOURCE_PLL3;
-      PeriphClkInitStruct.PLL3.PLL3M = pll3_m;
-      PeriphClkInitStruct.PLL3.PLL3N = pll3_n;
-      PeriphClkInitStruct.PLL3.PLL3P = pll3_p;
-      PeriphClkInitStruct.PLL3.PLL3Q = pll3_q;
-      PeriphClkInitStruct.PLL3.PLL3R = pll3_r;
-      PeriphClkInitStruct.PLL3.PLL3RGE = RCC_PLL3VCIRANGE_1;
-      PeriphClkInitStruct.PLL3.PLL3VCOSEL = RCC_PLL3VCOWIDE;
-      PeriphClkInitStruct.PLL3.PLL3FRACN = 0;
+      PeriphClkInitStruct.Spi123ClockSelection = RCC_SPI123CLKSOURCE_PLL2;
+      PeriphClkInitStruct.PLL2.PLL2M = pll2_m;
+      PeriphClkInitStruct.PLL2.PLL2N = pll2_n;
+      PeriphClkInitStruct.PLL2.PLL2P = pll2_p;
+      PeriphClkInitStruct.PLL2.PLL2Q = pll2_q;
+      PeriphClkInitStruct.PLL2.PLL2R = pll2_r;
+      PeriphClkInitStruct.PLL2.PLL2RGE = RCC_PLL2VCIRANGE_1;
+      PeriphClkInitStruct.PLL2.PLL2VCOSEL = RCC_PLL2VCOWIDE;
+      PeriphClkInitStruct.PLL2.PLL2FRACN = 0;
       if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInitStruct) != HAL_OK)
       {
         Error_Handler();
@@ -170,12 +175,12 @@ void HAL_SPI_MspInit(SPI_HandleTypeDef* hspi)
   */
     PeriphClkInitStruct.PeriphClockSelection = RCC_PERIPHCLK_SPI2;
     PeriphClkInitStruct.Spi123ClockSelection = RCC_SPI123CLKSOURCE_PLL2;
-    PeriphClkInitStruct.PLL2.PLL2M = 1;
-    PeriphClkInitStruct.PLL2.PLL2N = 50;
-    PeriphClkInitStruct.PLL2.PLL2P = 2;
-    PeriphClkInitStruct.PLL2.PLL2Q = 2;
-    PeriphClkInitStruct.PLL2.PLL2R = 2;
-    PeriphClkInitStruct.PLL2.PLL2RGE = RCC_PLL2VCIRANGE_3;
+    PeriphClkInitStruct.PLL2.PLL2M = pll2_m;
+    PeriphClkInitStruct.PLL2.PLL2N = pll2_n;
+    PeriphClkInitStruct.PLL2.PLL2P = pll2_p;
+    PeriphClkInitStruct.PLL2.PLL2Q = pll2_q;
+    PeriphClkInitStruct.PLL2.PLL2R = pll2_r;
+    PeriphClkInitStruct.PLL2.PLL2RGE = RCC_PLL2VCIRANGE_1;
     PeriphClkInitStruct.PLL2.PLL2VCOSEL = RCC_PLL2VCOWIDE;
     PeriphClkInitStruct.PLL2.PLL2FRACN = 0;
     if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInitStruct) != HAL_OK)
@@ -198,21 +203,21 @@ void HAL_SPI_MspInit(SPI_HandleTypeDef* hspi)
     GPIO_InitStruct.Pin = GPIO_PIN_2|GPIO_PIN_3;
     GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
     GPIO_InitStruct.Pull = GPIO_NOPULL;
-    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
     GPIO_InitStruct.Alternate = GPIO_AF5_SPI2;
     HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
     GPIO_InitStruct.Pin = GPIO_PIN_12;
     GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
     GPIO_InitStruct.Pull = GPIO_NOPULL;
-    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
     GPIO_InitStruct.Alternate = GPIO_AF5_SPI2;
     HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
     GPIO_InitStruct.Pin = GPIO_PIN_3;
     GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
     GPIO_InitStruct.Pull = GPIO_NOPULL;
-    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
     GPIO_InitStruct.Alternate = GPIO_AF5_SPI2;
     HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
 
@@ -275,20 +280,20 @@ void HAL_UART_MspInit(UART_HandleTypeDef* huart)
   /* USER CODE END USART1_MspInit 0 */
   /** Initializes the peripherals clock
   */
-//    PeriphClkInitStruct.PeriphClockSelection = RCC_PERIPHCLK_USART1;
-//    PeriphClkInitStruct.PLL3.PLL3M = 1;
-//    PeriphClkInitStruct.PLL3.PLL3N = 40;
-//    PeriphClkInitStruct.PLL3.PLL3P = 6;
-//    PeriphClkInitStruct.PLL3.PLL3Q = 4;
-//    PeriphClkInitStruct.PLL3.PLL3R = 6;
-//    PeriphClkInitStruct.PLL3.PLL3RGE = RCC_PLL3VCIRANGE_2;
-//    PeriphClkInitStruct.PLL3.PLL3VCOSEL = RCC_PLL3VCOWIDE;
-//    PeriphClkInitStruct.PLL3.PLL3FRACN = 0;
-//    PeriphClkInitStruct.Usart16ClockSelection = RCC_USART16CLKSOURCE_PLL3;
-//    if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInitStruct) != HAL_OK)
-//    {
-//      Error_Handler();
-//    }
+    PeriphClkInitStruct.PeriphClockSelection = RCC_PERIPHCLK_USART1;
+	  PeriphClkInitStruct.PLL3.PLL3M = pll3_m;
+	  PeriphClkInitStruct.PLL3.PLL3N = pll3_n;
+	  PeriphClkInitStruct.PLL3.PLL3P = pll3_p;
+	  PeriphClkInitStruct.PLL3.PLL3Q = pll3_q;
+	  PeriphClkInitStruct.PLL3.PLL3R = pll3_r;
+	  PeriphClkInitStruct.PLL3.PLL3RGE = RCC_PLL3VCIRANGE_1;
+	  PeriphClkInitStruct.PLL3.PLL3VCOSEL = RCC_PLL3VCOWIDE;
+	  PeriphClkInitStruct.PLL3.PLL3FRACN = 0;
+    PeriphClkInitStruct.Usart16ClockSelection = RCC_USART16CLKSOURCE_PLL3;
+    if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInitStruct) != HAL_OK)
+    {
+      Error_Handler();
+    }
 
     /* Peripheral clock enable */
     __HAL_RCC_USART1_CLK_ENABLE();
@@ -338,19 +343,18 @@ void HAL_UART_MspInit(UART_HandleTypeDef* huart)
   else if(huart->Instance==USART3)
   {
   /* USER CODE BEGIN USART3_MspInit 0 */
-	  RCC_PeriphCLKInitTypeDef usart3ClkInitStr = {0};
-	  usart3ClkInitStr.PeriphClockSelection = RCC_PERIPHCLK_USART234578;
-	  usart3ClkInitStr.PLL3.PLL3M = pll3_m;
-	  usart3ClkInitStr.PLL3.PLL3N = pll3_n;
-	  usart3ClkInitStr.PLL3.PLL3P = pll3_p;
-	  usart3ClkInitStr.PLL3.PLL3Q = pll3_q;
-	  usart3ClkInitStr.PLL3.PLL3R = pll3_r;
-	  usart3ClkInitStr.PLL3.PLL3RGE = RCC_PLL3VCIRANGE_1;
-	  usart3ClkInitStr.PLL3.PLL3VCOSEL = RCC_PLL3VCOWIDE;
-	  usart3ClkInitStr.PLL3.PLL3FRACN = 0;
-	  usart3ClkInitStr.Usart234578ClockSelection = RCC_USART234578CLKSOURCE_PLL3;
+	  PeriphClkInitStruct.PeriphClockSelection = RCC_PERIPHCLK_USART234578;
+	  PeriphClkInitStruct.PLL3.PLL3M = pll3_m;
+	  PeriphClkInitStruct.PLL3.PLL3N = pll3_n;
+	  PeriphClkInitStruct.PLL3.PLL3P = pll3_p;
+	  PeriphClkInitStruct.PLL3.PLL3Q = pll3_q;
+	  PeriphClkInitStruct.PLL3.PLL3R = pll3_r;
+	  PeriphClkInitStruct.PLL3.PLL3RGE = RCC_PLL3VCIRANGE_1;
+	  PeriphClkInitStruct.PLL3.PLL3VCOSEL = RCC_PLL3VCOWIDE;
+	  PeriphClkInitStruct.PLL3.PLL3FRACN = 0;
+	  PeriphClkInitStruct.Usart234578ClockSelection = RCC_USART234578CLKSOURCE_PLL3;
 
-	  if (HAL_RCCEx_PeriphCLKConfig(&usart3ClkInitStr) != HAL_OK)
+	  if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInitStruct) != HAL_OK)
 	  {
 	    Error_Handler();
 	  }
@@ -368,7 +372,7 @@ void HAL_UART_MspInit(UART_HandleTypeDef* huart)
     GPIO_InitStruct.Pin = STLINK_RX_Pin|STLINK_TX_Pin;
     GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
     GPIO_InitStruct.Pull = GPIO_NOPULL;
-    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
     GPIO_InitStruct.Alternate = GPIO_AF7_USART3;
     HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
 
