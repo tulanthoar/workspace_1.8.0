@@ -27,6 +27,11 @@ extern DMA_HandleTypeDef hdma_usart1_tx;
 
 extern DMA_HandleTypeDef hdma_usart3_tx;
 extern DMA_HandleTypeDef hdma_spi1_rx;
+const unsigned short pll3_m = 4;
+const unsigned short pll3_n = 368;
+const unsigned short pll3_p = 50;
+const unsigned short pll3_q = 8;
+const unsigned short pll3_r = 2;
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN TD */
@@ -98,12 +103,12 @@ void HAL_SPI_MspInit(SPI_HandleTypeDef* hspi)
     */
       PeriphClkInitStruct.PeriphClockSelection = RCC_PERIPHCLK_SPI1;
       PeriphClkInitStruct.Spi123ClockSelection = RCC_SPI123CLKSOURCE_PLL3;
-      PeriphClkInitStruct.PLL3.PLL3M = 1;
-      PeriphClkInitStruct.PLL3.PLL3N = 60;
-      PeriphClkInitStruct.PLL3.PLL3P = 32;
-      PeriphClkInitStruct.PLL3.PLL3Q = 5;
-      PeriphClkInitStruct.PLL3.PLL3R = 6;
-      PeriphClkInitStruct.PLL3.PLL3RGE = RCC_PLL3VCIRANGE_2;
+      PeriphClkInitStruct.PLL3.PLL3M = pll3_m;
+      PeriphClkInitStruct.PLL3.PLL3N = pll3_n;
+      PeriphClkInitStruct.PLL3.PLL3P = pll3_p;
+      PeriphClkInitStruct.PLL3.PLL3Q = pll3_q;
+      PeriphClkInitStruct.PLL3.PLL3R = pll3_r;
+      PeriphClkInitStruct.PLL3.PLL3RGE = RCC_PLL3VCIRANGE_1;
       PeriphClkInitStruct.PLL3.PLL3VCOSEL = RCC_PLL3VCOWIDE;
       PeriphClkInitStruct.PLL3.PLL3FRACN = 0;
       if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInitStruct) != HAL_OK)
@@ -335,12 +340,12 @@ void HAL_UART_MspInit(UART_HandleTypeDef* huart)
   /* USER CODE BEGIN USART3_MspInit 0 */
 	  RCC_PeriphCLKInitTypeDef usart3ClkInitStr = {0};
 	  usart3ClkInitStr.PeriphClockSelection = RCC_PERIPHCLK_USART234578;
-	  usart3ClkInitStr.PLL3.PLL3M = 1;
-	  usart3ClkInitStr.PLL3.PLL3N = 60;
-	  usart3ClkInitStr.PLL3.PLL3P = 32;
-	  usart3ClkInitStr.PLL3.PLL3Q = 5;
-	  usart3ClkInitStr.PLL3.PLL3R = 6;
-	  usart3ClkInitStr.PLL3.PLL3RGE = RCC_PLL3VCIRANGE_2;
+	  usart3ClkInitStr.PLL3.PLL3M = pll3_m;
+	  usart3ClkInitStr.PLL3.PLL3N = pll3_n;
+	  usart3ClkInitStr.PLL3.PLL3P = pll3_p;
+	  usart3ClkInitStr.PLL3.PLL3Q = pll3_q;
+	  usart3ClkInitStr.PLL3.PLL3R = pll3_r;
+	  usart3ClkInitStr.PLL3.PLL3RGE = RCC_PLL3VCIRANGE_1;
 	  usart3ClkInitStr.PLL3.PLL3VCOSEL = RCC_PLL3VCOWIDE;
 	  usart3ClkInitStr.PLL3.PLL3FRACN = 0;
 	  usart3ClkInitStr.Usart234578ClockSelection = RCC_USART234578CLKSOURCE_PLL3;

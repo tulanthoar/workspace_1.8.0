@@ -59,17 +59,19 @@ PCD_HandleTypeDef hpcd_USB_OTG_FS;
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_USART3_UART_Init(void);
-static void MX_SPI2_Init(void);
+//static void MX_SPI2_Init(void);
 static void MX_SPI1_Init(void);
 static void MX_DMA_Init(void);
-static void MX_USART1_UART_Init(void);
+//static void MX_USART1_UART_Init(void);
 static void tx_complete(DMA_HandleTypeDef *hdma);
+static void tx_h_complete(DMA_HandleTypeDef *hdma);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
 enum {
   TRANSFER_WAIT,
   TRANSFER_COMPLETE,
+  TRANSFER_H_COMPLETE,
   TRANSFER_ERROR
 };
 /* Private user code ---------------------------------------------------------*/
@@ -77,8 +79,7 @@ enum {
 __IO ITStatus UartReady = RESET;
 __IO uint32_t UserButtonStatus = 0;  /* set to 1 after User Button interrupt  */
 ALIGN_32BYTES (uint16_t aTxBuffer[2048]) = {0};
-ALIGN_32BYTES (uint16_t aRxBuffer0[2048]) = {0};
-ALIGN_32BYTES (uint16_t aRxBuffer1[2048]) = {0};
+ALIGN_32BYTES (uint16_t aRxBuffer[4096]) = {0};
 __IO uint32_t wTransferState = TRANSFER_WAIT;
 /* USER CODE END 0 */
 
@@ -88,16 +89,16 @@ __IO uint32_t wTransferState = TRANSFER_WAIT;
   */
 int main(void)
 {
+	unsigned short rxCount = COUNTOF(aRxBuffer);
+	unsigned short txCount = COUNTOF(aTxBuffer);
   /* USER CODE BEGIN 1 */
-  for( int i = 0; i < COUNTOF(aTxBuffer); ++i ){
+  for( int i = 0; i < txCount; ++i ){
 	  aTxBuffer[i] = i % 16384;
   }
   /* USER CODE END 1 */
 
   /* Enable I-Cache---------------------------------------------------------*/
   SCB_EnableICache();
-
-  /* Enable D-Cache---------------------------------------------------------*/
 //  SCB_EnableDCache();
 
   /* MCU Configuration--------------------------------------------------------*/
@@ -121,15 +122,12 @@ int main(void)
   HAL_EnableCompensationCell();
   MX_DMA_Init();
   MX_USART3_UART_Init();
-  MX_SPI2_Init();
+//  MX_USART1_UART_Init();
+//  MX_SPI2_Init();
   MX_SPI1_Init();
-  MX_USART1_UART_Init();
   /* USER CODE BEGIN 2 */
   /* Configure User push-button in Interrupt mode */
-  BSP_LED_Init(LED1);
-  BSP_LED_Init(LED2);
-  BSP_LED_Init(LED3);
-  BSP_PB_Init(BUTTON_USER, BUTTON_MODE_EXTI);
+
   while(UserButtonStatus == 0)
   {
     BSP_LED_Toggle(LED1);
@@ -156,37 +154,15 @@ int main(void)
   BSP_LED_Off(LED1);
   while(UserButtonStatus == 0)
   {
-    /* Toggle LED1*/
     BSP_LED_Toggle(LED2);
     HAL_Delay(100);
   }
   UserButtonStatus = 0;
-
   UartReady = RESET;
   BSP_LED_Off(LED1);
   BSP_LED_Off(LED2);
     /* Process Locked */
     __HAL_LOCK(&hspi1);
-
-    if (hspi1.State != HAL_SPI_STATE_READY)
-    {
-      __HAL_UNLOCK(&hspi1);
-      Error_Handler();
-    }
-
-
-    /* Set the transaction information */
-    hspi1.State       = HAL_SPI_STATE_BUSY_RX;
-    hspi1.ErrorCode   = HAL_SPI_ERROR_NONE;
-    hspi1.pRxBuffPtr  = (uint8_t *)aTxBuffer;
-    hspi1.RxXferSize  = sizeof(aTxBuffer)/2;
-    hspi1.RxXferCount = sizeof(aTxBuffer)/2;
-
-    /*Init field not used in handle to zero */
-    hspi1.RxISR       = NULL;
-    hspi1.TxISR       = NULL;
-    hspi1.TxXferSize  = (uint16_t) 0UL;
-    hspi1.TxXferCount = (uint16_t) 0UL;
 
     /* Configure communication direction : 1Line */
     if (hspi1.Init.Direction == SPI_DIRECTION_1LINE)
@@ -194,35 +170,16 @@ int main(void)
       SPI_1LINE_RX(&hspi1);
     }
 
-    /* Packing mode management is enabled by the DMA settings */
-    if (((hspi1.Init.DataSize > SPI_DATASIZE_16BIT) && (hspi1.hdmarx->Init.MemDataAlignment != DMA_MDATAALIGN_WORD))    || \
-        ((hspi1.Init.DataSize > SPI_DATASIZE_8BIT) && ((hspi1.hdmarx->Init.MemDataAlignment != DMA_MDATAALIGN_HALFWORD) && \
-                                                       (hspi1.hdmarx->Init.MemDataAlignment != DMA_MDATAALIGN_WORD))))
-    {
-      /* Restriction the DMA data received is not allowed in this mode */
-
-      __HAL_UNLOCK(&hspi1);
-      Error_Handler();
-    }
-
     /* Clear RXDMAEN bit */
     CLEAR_BIT(hspi1.Instance->CFG1, SPI_CFG1_RXDMAEN);
 
-
-    /* Set the SPI RxDMA Half transfer complete callback */
-    hspi1.hdmarx->XferHalfCpltCallback = NULL;
-
     /* Set the SPI Rx DMA transfer complete callback */
     hspi1.hdmarx->XferCpltCallback = tx_complete;
+    hspi1.hdmarx->XferHalfCpltCallback = tx_h_complete;
 
-    /* Set the DMA error callback */
-    hspi1.hdmarx->XferErrorCallback = NULL;
-
-    /* Set the DMA AbortCpltCallback */
-    hspi1.hdmarx->XferAbortCallback = NULL;
-    MODIFY_REG(((DMA_Stream_TypeDef   *)hdma_spi1_rx.Instance)->CR, (DMA_IT_TC), (DMA_IT_TC));
+    MODIFY_REG(((DMA_Stream_TypeDef   *)hdma_spi1_rx.Instance)->CR, (DMA_IT_TC | DMA_IT_HT), (DMA_IT_TC | DMA_IT_HT));
     /* Enable the Rx DMA Stream/Channel  */
-    if (HAL_OK != HAL_DMA_Start(hspi1.hdmarx, (uint32_t)&hspi1.Instance->RXDR, (uint32_t)hspi1.pRxBuffPtr, hspi1.RxXferCount))
+    if (HAL_OK != HAL_DMA_Start(hspi1.hdmarx, (uint32_t)&hspi1.Instance->RXDR, (uint32_t)aRxBuffer, rxCount))
     {
       /* Update SPI error code */
       SET_BIT(hspi1.ErrorCode, HAL_SPI_ERROR_DMA);
@@ -230,15 +187,7 @@ int main(void)
       Error_Handler();
     }
 
-    /* Set the number of data at current transfer */
-    if (hspi1.hdmarx->Init.Mode == DMA_CIRCULAR)
-    {
       MODIFY_REG(hspi1.Instance->CR2, SPI_CR2_TSIZE, 0UL);
-    }
-    else
-    {
-      MODIFY_REG(hspi1.Instance->CR2, SPI_CR2_TSIZE, sizeof(aTxBuffer)/2);
-    }
 
     /* Enable Rx DMA Request */
     SET_BIT(hspi1.Instance->CFG1, SPI_CFG1_RXDMAEN);
@@ -249,51 +198,49 @@ int main(void)
     /* Enable SPI peripheral */
     __HAL_SPI_ENABLE(&hspi1);
 
-    if (hspi1.Init.Mode == SPI_MODE_MASTER)
-    {
-      /* Master transfer start */
       SET_BIT(hspi1.Instance->CR1, SPI_CR1_CSTART);
-    }
-  while (wTransferState == TRANSFER_WAIT)
+
+  while (wTransferState != TRANSFER_H_COMPLETE)
   {
 	    BSP_LED_Toggle(LED3);
-	    HAL_Delay(100);
   }
   wTransferState = TRANSFER_WAIT;
-
-  UserButtonStatus = 0;
+  for( int i = 0; i < txCount; ++i ){
+	  aTxBuffer[i] = aRxBuffer[i];
+  }
+  if(HAL_UART_Transmit_DMA(&huart3, (uint8_t*)aTxBuffer, sizeof(aTxBuffer))!= HAL_OK)
+  {
+    Error_Handler();
+  }
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-
-    /* USER CODE END WHILE */
+	  while (wTransferState != TRANSFER_COMPLETE) {}
+	  wTransferState = TRANSFER_WAIT;
+	  for( int i = 0; i < txCount; ++i ){
+		  aTxBuffer[i] = aRxBuffer[i + txCount];
+	  }
+	  while ((UartReady == RESET)) {}
+	  UartReady = RESET;
 	  /*##-2- Start the transmission process #####################################*/
 	  if(HAL_UART_Transmit_DMA(&huart3, (uint8_t*)aTxBuffer, sizeof(aTxBuffer))!= HAL_OK)
 	  {
 	    Error_Handler();
 	  }
-	  /*##-3- Wait for the end of the transfer ###################################*/
-
-
-
-	  UserButtonStatus = 0;
-	  HAL_Delay(17);
-	  while ((UartReady == RESET))
-	  {
-		    BSP_LED_Toggle(LED1);
-//		    HAL_Delay(100);
-	  }
-	  UartReady = RESET;
-	  while (wTransferState == TRANSFER_WAIT)
-	  {
-		    BSP_LED_Toggle(LED3);
-//		    HAL_Delay(100);
-	  }
+	  while (wTransferState != TRANSFER_H_COMPLETE) {}
 	  wTransferState = TRANSFER_WAIT;
-    /* USER CODE BEGIN 3 */
+	  for( int i = 0; i < txCount; ++i ){
+		  aTxBuffer[i] = aRxBuffer[i];
+	  }
+	  while ((UartReady == RESET)) {}
+	  UartReady = RESET;
+	  /*##-2- Start the transmission process #####################################*/
+	  if(HAL_UART_Transmit_DMA(&huart3, (uint8_t*)aTxBuffer, sizeof(aTxBuffer))!= HAL_OK)
+	  {
+		Error_Handler();
+	  }
   }
-  /* USER CODE END 3 */
 }
 
 /**
@@ -325,7 +272,7 @@ void SystemClock_Config(void)
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
   RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
   RCC_OscInitStruct.PLL.PLLM = 1;
-  RCC_OscInitStruct.PLL.PLLN = 120;
+  RCC_OscInitStruct.PLL.PLLN = 115;
   RCC_OscInitStruct.PLL.PLLP = 2;
   RCC_OscInitStruct.PLL.PLLQ = 4;
   RCC_OscInitStruct.PLL.PLLR = 2;
@@ -511,7 +458,7 @@ static void MX_USART3_UART_Init(void)
 
   /* USER CODE END USART3_Init 1 */
   huart3.Instance = USART3;
-  huart3.Init.BaudRate = 12000000;
+  huart3.Init.BaudRate = 11978688;
   huart3.Init.WordLength = UART_WORDLENGTH_8B;
   huart3.Init.StopBits = UART_STOPBITS_1;
   huart3.Init.Parity = UART_PARITY_NONE;
@@ -612,6 +559,10 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(LD2_GPIO_Port, &GPIO_InitStruct);
 
+  BSP_LED_Init(LED1);
+  BSP_LED_Init(LED2);
+  BSP_LED_Init(LED3);
+  BSP_PB_Init(BUTTON_USER, BUTTON_MODE_EXTI);
 }
 
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
@@ -634,6 +585,13 @@ void tx_complete(DMA_HandleTypeDef *hdma)
 	  /* Turn LED1 on: Transfer in transmission process is complete */
 	  BSP_LED_On(LED1);
 	  wTransferState = TRANSFER_COMPLETE;
+}
+
+void tx_h_complete(DMA_HandleTypeDef *hdma)
+{
+	  /* Turn LED1 on: Transfer in transmission process is complete */
+	  BSP_LED_On(LED1);
+	  wTransferState = TRANSFER_H_COMPLETE;
 }
 
 /**
