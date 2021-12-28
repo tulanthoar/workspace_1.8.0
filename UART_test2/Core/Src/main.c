@@ -78,8 +78,8 @@ enum {
 /* USER CODE BEGIN 0 */
 __IO ITStatus UartReady = RESET;
 __IO uint32_t UserButtonStatus = 0;  /* set to 1 after User Button interrupt  */
-ALIGN_32BYTES (uint16_t aTxBuffer[1024]) = {0};
-ALIGN_32BYTES (uint16_t aRxBuffer[8192]) = {0};
+ALIGN_32BYTES (__IO uint16_t aTxBuffer[1024]) = {0};
+ALIGN_32BYTES (__IO uint16_t aRxBuffer[8192]) = {0};
 float yi[8192] = {0};
 __IO uint32_t wTransferState = TRANSFER_WAIT;
 #define OVERSAMPLING 4
@@ -222,7 +222,8 @@ int main(void)
   }
   HAL_NVIC_DisableIRQ(USART3_IRQn);
   HAL_NVIC_DisableIRQ(USART3_DMA_IRQN);
-//  CLEAR_BIT(USART3_DMA_INSTANCE->CR, (DMA_IT_TC | DMA_IT_TE | DMA_IT_DME ));
+  HAL_NVIC_DisableIRQ(SPI1_DMA_IRQN);
+  CLEAR_BIT(USART3_DMA_INSTANCE->CR, (DMA_IT_TC | DMA_IT_HT | DMA_IT_TE | DMA_IT_DME ));
   DMA1->LIFCR = DMA_FLAG_TCIF1_5 | DMA_FLAG_HTIF1_5;
   BSP_LED_Off(LED3);
 
@@ -230,8 +231,8 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
-	  while (wTransferState != TRANSFER_COMPLETE) {}
-	  wTransferState = TRANSFER_WAIT;
+	  while ((DMA2->LISR & DMA_FLAG_TCIF0_4) != DMA_FLAG_TCIF0_4 ) {}
+	  DMA2->LIFCR = DMA_FLAG_TCIF0_4;
 	  j = rxOffset;
 	  aTxBuffer[0] = aRxBuffer[j];
 	  for( int i = 1; i < txCount; ++i ){
@@ -242,14 +243,15 @@ int main(void)
 //		  aTxBuffer[i] = (uint16_t)yi[j];
 		  aTxBuffer[i] = aRxBuffer[j];
 	  }
+
 	  while ((USART3->ISR & UART_FLAG_TC) != UART_FLAG_TC)  {  }
+	  USART3->ICR = UART_CLEAR_TCF;
 	  DMA1->LIFCR = DMA_FLAG_TCIF1_5 | DMA_FLAG_HTIF1_5;
-	  SET_BIT(USART3_DMA_INSTANCE->CR, (DMA_IT_TC | DMA_IT_TE | DMA_IT_DME | DMA_SxCR_EN));
-	  SET_BIT(USART3->ICR, UART_CLEAR_TCF);
+	  SET_BIT(USART3_DMA_INSTANCE->CR, (DMA_SxCR_EN));
 	  SET_BIT(USART3->CR3, USART_CR3_DMAT);
 
-	  while (wTransferState != TRANSFER_H_COMPLETE) {}
-	  wTransferState = TRANSFER_WAIT;
+	  while ((DMA2->LISR & DMA_FLAG_HTIF0_4) != DMA_FLAG_HTIF0_4 ) {}
+	  DMA2->LIFCR = DMA_FLAG_HTIF0_4;
 	  j = 0;
 	  aTxBuffer[0] = aRxBuffer[0];
 	  for( int i = 1; i < txCount; ++i){
@@ -260,10 +262,9 @@ int main(void)
 	  }
 
 	  while ((USART3->ISR & UART_FLAG_TC) != UART_FLAG_TC)  {  }
+	  USART3->ICR = UART_CLEAR_TCF;
 	  DMA1->LIFCR = DMA_FLAG_TCIF1_5 | DMA_FLAG_HTIF1_5;
-	  /*##-2- Start the transmission process #####################################*/
-	  SET_BIT(USART3_DMA_INSTANCE->CR, (DMA_IT_TC | DMA_IT_TE | DMA_IT_DME | DMA_SxCR_EN));
-	  SET_BIT(USART3->ICR, UART_CLEAR_TCF);
+	  SET_BIT(USART3_DMA_INSTANCE->CR, (DMA_SxCR_EN));
 	  SET_BIT(USART3->CR3, USART_CR3_DMAT);
   }
 }
