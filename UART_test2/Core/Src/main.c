@@ -226,16 +226,10 @@ int main(void)
 	  }
 	  while ((UartReady == RESET)) {}
 	  UartReady = RESET;
-//	  HAL_DMA_Start_IT(huart3.hdmatx, (uint32_t)aTxBuffer, (uint32_t)&huart3.Instance->TDR, sizeof(aTxBuffer));
-	  __HAL_DMA_ENABLE(&hdma_usart3_tx);
-	  MODIFY_REG(USART3_DMA_INSTANCE->CR, (DMA_IT_TC | DMA_IT_TE | DMA_IT_DME | DMA_IT_HT), (DMA_IT_TC | DMA_IT_TE | DMA_IT_DME));
-	  __HAL_UART_CLEAR_FLAG(&huart3, UART_CLEAR_TCF);
-	  SET_BIT(huart3.Instance->CR3, USART_CR3_DMAT);
-	  /*##-2- Start the transmission process #####################################*/
-//	  if(HAL_UART_Transmit_DMA(&huart3, (uint8_t*)aTxBuffer, sizeof(aTxBuffer))!= HAL_OK)
-//	  {
-//	    Error_Handler();
-//	  }
+	  MODIFY_REG(USART3_DMA_INSTANCE->CR, (DMA_IT_TC | DMA_IT_TE | DMA_IT_DME | DMA_IT_HT | DMA_SxCR_EN), (DMA_IT_TC | DMA_IT_TE | DMA_IT_DME | DMA_SxCR_EN));
+	  SET_BIT(USART3->ICR, UART_CLEAR_TCF);
+	  SET_BIT(USART3->CR3, USART_CR3_DMAT);
+
 	  while (wTransferState != TRANSFER_H_COMPLETE) {}
 	  wTransferState = TRANSFER_WAIT;
 	  j = 0;
@@ -246,10 +240,9 @@ int main(void)
 	  while ((UartReady == RESET)) {}
 	  UartReady = RESET;
 	  /*##-2- Start the transmission process #####################################*/
-	  __HAL_DMA_ENABLE(&hdma_usart3_tx);
-	  MODIFY_REG(USART3_DMA_INSTANCE->CR, (DMA_IT_TC | DMA_IT_TE | DMA_IT_DME | DMA_IT_HT), (DMA_IT_TC | DMA_IT_TE | DMA_IT_DME));
-	  __HAL_UART_CLEAR_FLAG(&huart3, UART_CLEAR_TCF);
-	  SET_BIT(huart3.Instance->CR3, USART_CR3_DMAT);
+	  MODIFY_REG(USART3_DMA_INSTANCE->CR, (DMA_IT_TC | DMA_IT_TE | DMA_IT_DME | DMA_IT_HT | DMA_SxCR_EN), (DMA_IT_TC | DMA_IT_TE | DMA_IT_DME | DMA_SxCR_EN));
+	  SET_BIT(USART3->ICR, UART_CLEAR_TCF);
+	  SET_BIT(USART3->CR3, USART_CR3_DMAT);
   }
 }
 
