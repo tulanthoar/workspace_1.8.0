@@ -80,6 +80,7 @@ __IO ITStatus UartReady = RESET;
 __IO uint32_t UserButtonStatus = 0;  /* set to 1 after User Button interrupt  */
 ALIGN_32BYTES (uint16_t aTxBuffer[1024]) = {0};
 ALIGN_32BYTES (uint16_t aRxBuffer[10240]) = {0};
+ALIGN_32BYTES (float yi[10240]) = {0};
 __IO uint32_t wTransferState = TRANSFER_WAIT;
 /* USER CODE END 0 */
 
@@ -207,7 +208,11 @@ int main(void)
   }
   wTransferState = TRANSFER_WAIT;
   int j = 0;
-  for( int i = 0; i < txCount; ++i, j += 5 ){
+  aTxBuffer[0] = aRxBuffer[0];
+  for( int i = 1; i < txCount; ++i){
+	  for( int k = 0; k < 5; ++k, ++j){
+		  yi[j] = aRxBuffer[j] * 1.0;
+	  }
 	  aTxBuffer[i] = aRxBuffer[j];
   }
   if(HAL_UART_Transmit_DMA(&huart3, (uint8_t*)aTxBuffer, sizeof(aTxBuffer))!= HAL_OK)
@@ -221,7 +226,11 @@ int main(void)
 	  while (wTransferState != TRANSFER_COMPLETE) {}
 	  wTransferState = TRANSFER_WAIT;
 	  j = rxOffset;
-	  for( int i = 0; i < txCount; ++i, j+=5 ){
+	  aTxBuffer[0] = aRxBuffer[j];
+	  for( int i = 1; i < txCount; ++i ){
+		  for( int k = 0; k < 5; ++k, ++j){
+			  yi[j] = aRxBuffer[j] * 1.0;
+		  }
 		  aTxBuffer[i] = aRxBuffer[j];
 	  }
 	  while ((UartReady == RESET)) {}
@@ -233,7 +242,11 @@ int main(void)
 	  while (wTransferState != TRANSFER_H_COMPLETE) {}
 	  wTransferState = TRANSFER_WAIT;
 	  j = 0;
-	  for( int i = 0; i < txCount; ++i, j+=5 ){
+	  aTxBuffer[0] = aRxBuffer[0];
+	  for( int i = 1; i < txCount; ++i){
+		  for( int k = 0; k < 5; ++k, ++j){
+			  yi[j] = aRxBuffer[j] * 1.0;
+		  }
 		  aTxBuffer[i] = aRxBuffer[j];
 	  }
 
