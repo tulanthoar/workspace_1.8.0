@@ -218,6 +218,7 @@ int main(void)
   {
     Error_Handler();
   }
+  HAL_SuspendTick();
   HAL_NVIC_DisableIRQ(USART3_IRQn);
   HAL_NVIC_DisableIRQ(USART3_DMA_IRQN);
   HAL_NVIC_DisableIRQ(SPI1_DMA_IRQN);
