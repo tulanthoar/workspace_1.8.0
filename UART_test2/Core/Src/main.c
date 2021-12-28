@@ -210,10 +210,8 @@ int main(void)
   wTransferState = TRANSFER_WAIT;
   int j = 0;
   aTxBuffer[0] = aRxBuffer[0];
-  for( int i = 1; i < txCount; ++i){
-	  for( int k = 0; k < OVERSAMPLING; ++k, ++j){
-		  yi[j] = aRxBuffer[j] * 1.0;
-	  }
+  for( int i = 1; i < txCount; ++i, j+= OVERSAMPLING){
+	  j+= OVERSAMPLING;
 	  aTxBuffer[i] = aRxBuffer[j];
   }
   if(HAL_UART_Transmit_DMA(&huart3, (uint8_t*)aTxBuffer, sizeof(aTxBuffer))!= HAL_OK)
@@ -223,8 +221,6 @@ int main(void)
   HAL_NVIC_DisableIRQ(USART3_IRQn);
   HAL_NVIC_DisableIRQ(USART3_DMA_IRQN);
   HAL_NVIC_DisableIRQ(SPI1_DMA_IRQN);
-  CLEAR_BIT(USART3_DMA_INSTANCE->CR, (DMA_IT_TC | DMA_IT_HT | DMA_IT_TE | DMA_IT_DME ));
-  DMA1->LIFCR = DMA_FLAG_TCIF1_5 | DMA_FLAG_HTIF1_5;
   BSP_LED_Off(LED3);
 
   /* Infinite loop */
