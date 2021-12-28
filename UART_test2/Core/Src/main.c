@@ -154,7 +154,6 @@ int main(void)
   {
     return HAL_TIMEOUT;
   }
-//  while ((USART3->ISR & UART_FLAG_TC) != UART_FLAG_TC)  {  }
   BSP_LED_Off(LED1);
   while(UserButtonStatus == 0)
   {
@@ -221,10 +220,10 @@ int main(void)
   {
     Error_Handler();
   }
-//  HAL_NVIC_DisableIRQ(USART3_IRQn);
-//  HAL_NVIC_DisableIRQ(USART3_DMA_IRQN);
+  HAL_NVIC_DisableIRQ(USART3_IRQn);
+  HAL_NVIC_DisableIRQ(USART3_DMA_IRQN);
 //  CLEAR_BIT(USART3_DMA_INSTANCE->CR, (DMA_IT_TC | DMA_IT_TE | DMA_IT_DME ));
-//  DMA1->LIFCR = DMA_FLAG_TCIF1_5 | DMA_FLAG_HTIF1_5;
+  DMA1->LIFCR = DMA_FLAG_TCIF1_5 | DMA_FLAG_HTIF1_5;
   BSP_LED_Off(LED3);
 
   /* Infinite loop */
@@ -244,6 +243,7 @@ int main(void)
 		  aTxBuffer[i] = aRxBuffer[j];
 	  }
 	  while ((USART3->ISR & UART_FLAG_TC) != UART_FLAG_TC)  {  }
+	  DMA1->LIFCR = DMA_FLAG_TCIF1_5 | DMA_FLAG_HTIF1_5;
 	  SET_BIT(USART3_DMA_INSTANCE->CR, (DMA_IT_TC | DMA_IT_TE | DMA_IT_DME | DMA_SxCR_EN));
 	  SET_BIT(USART3->ICR, UART_CLEAR_TCF);
 	  SET_BIT(USART3->CR3, USART_CR3_DMAT);
@@ -260,6 +260,7 @@ int main(void)
 	  }
 
 	  while ((USART3->ISR & UART_FLAG_TC) != UART_FLAG_TC)  {  }
+	  DMA1->LIFCR = DMA_FLAG_TCIF1_5 | DMA_FLAG_HTIF1_5;
 	  /*##-2- Start the transmission process #####################################*/
 	  SET_BIT(USART3_DMA_INSTANCE->CR, (DMA_IT_TC | DMA_IT_TE | DMA_IT_DME | DMA_SxCR_EN));
 	  SET_BIT(USART3->ICR, UART_CLEAR_TCF);
