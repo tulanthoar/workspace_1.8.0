@@ -79,9 +79,10 @@ enum {
 __IO ITStatus UartReady = RESET;
 __IO uint32_t UserButtonStatus = 0;  /* set to 1 after User Button interrupt  */
 ALIGN_32BYTES (uint16_t aTxBuffer[1024]) = {0};
-ALIGN_32BYTES (uint16_t aRxBuffer[10240]) = {0};
-ALIGN_32BYTES (float yi[10240]) = {0};
+ALIGN_32BYTES (uint16_t aRxBuffer[8192]) = {0};
+float yi[8192] = {0};
 __IO uint32_t wTransferState = TRANSFER_WAIT;
+#define OVERSAMPLING 4
 /* USER CODE END 0 */
 
 /**
@@ -153,6 +154,7 @@ int main(void)
   {
     return HAL_TIMEOUT;
   }
+//  while ((USART3->ISR & UART_FLAG_TC) != UART_FLAG_TC)  {  }
   BSP_LED_Off(LED1);
   while(UserButtonStatus == 0)
   {
@@ -210,7 +212,7 @@ int main(void)
   int j = 0;
   aTxBuffer[0] = aRxBuffer[0];
   for( int i = 1; i < txCount; ++i){
-	  for( int k = 0; k < 5; ++k, ++j){
+	  for( int k = 0; k < OVERSAMPLING; ++k, ++j){
 		  yi[j] = aRxBuffer[j] * 1.0;
 	  }
 	  aTxBuffer[i] = aRxBuffer[j];
@@ -219,6 +221,12 @@ int main(void)
   {
     Error_Handler();
   }
+//  HAL_NVIC_DisableIRQ(USART3_IRQn);
+//  HAL_NVIC_DisableIRQ(USART3_DMA_IRQN);
+//  CLEAR_BIT(USART3_DMA_INSTANCE->CR, (DMA_IT_TC | DMA_IT_TE | DMA_IT_DME ));
+//  DMA1->LIFCR = DMA_FLAG_TCIF1_5 | DMA_FLAG_HTIF1_5;
+  BSP_LED_Off(LED3);
+
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
@@ -228,14 +236,15 @@ int main(void)
 	  j = rxOffset;
 	  aTxBuffer[0] = aRxBuffer[j];
 	  for( int i = 1; i < txCount; ++i ){
-		  for( int k = 0; k < 5; ++k, ++j){
+		  for( int k = 0; k < OVERSAMPLING; ++k, ++j){
 			  yi[j] = aRxBuffer[j] * 1.0;
 		  }
+//		  yi[j] = aRxBuffer[j] * 1.0;
+//		  aTxBuffer[i] = (uint16_t)yi[j];
 		  aTxBuffer[i] = aRxBuffer[j];
 	  }
-	  while ((UartReady == RESET)) {}
-	  UartReady = RESET;
-	  MODIFY_REG(USART3_DMA_INSTANCE->CR, (DMA_IT_TC | DMA_IT_TE | DMA_IT_DME | DMA_IT_HT | DMA_SxCR_EN), (DMA_IT_TC | DMA_IT_TE | DMA_IT_DME | DMA_SxCR_EN));
+	  while ((USART3->ISR & UART_FLAG_TC) != UART_FLAG_TC)  {  }
+	  SET_BIT(USART3_DMA_INSTANCE->CR, (DMA_IT_TC | DMA_IT_TE | DMA_IT_DME | DMA_SxCR_EN));
 	  SET_BIT(USART3->ICR, UART_CLEAR_TCF);
 	  SET_BIT(USART3->CR3, USART_CR3_DMAT);
 
@@ -244,16 +253,15 @@ int main(void)
 	  j = 0;
 	  aTxBuffer[0] = aRxBuffer[0];
 	  for( int i = 1; i < txCount; ++i){
-		  for( int k = 0; k < 5; ++k, ++j){
+		  for( int k = 0; k < OVERSAMPLING; ++k, ++j){
 			  yi[j] = aRxBuffer[j] * 1.0;
 		  }
 		  aTxBuffer[i] = aRxBuffer[j];
 	  }
 
-	  while ((UartReady == RESET)) {}
-	  UartReady = RESET;
+	  while ((USART3->ISR & UART_FLAG_TC) != UART_FLAG_TC)  {  }
 	  /*##-2- Start the transmission process #####################################*/
-	  MODIFY_REG(USART3_DMA_INSTANCE->CR, (DMA_IT_TC | DMA_IT_TE | DMA_IT_DME | DMA_IT_HT | DMA_SxCR_EN), (DMA_IT_TC | DMA_IT_TE | DMA_IT_DME | DMA_SxCR_EN));
+	  SET_BIT(USART3_DMA_INSTANCE->CR, (DMA_IT_TC | DMA_IT_TE | DMA_IT_DME | DMA_SxCR_EN));
 	  SET_BIT(USART3->ICR, UART_CLEAR_TCF);
 	  SET_BIT(USART3->CR3, USART_CR3_DMAT);
   }
@@ -589,24 +597,24 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
   }
 }
 
-void HAL_SPI_RxCpltCallback(SPI_HandleTypeDef *hspi)
-{
-  /* Turn LED1 on: Transfer in transmission process is complete */
-  BSP_LED_On(LED1);
-  wTransferState = TRANSFER_COMPLETE;
-}
+//void HAL_SPI_RxCpltCallback(SPI_HandleTypeDef *hspi)
+//{
+//  /* Turn LED1 on: Transfer in transmission process is complete */
+//  BSP_LED_On(LED1);
+//  wTransferState = TRANSFER_COMPLETE;
+//}
 
 void tx_complete(DMA_HandleTypeDef *hdma)
 {
 	  /* Turn LED1 on: Transfer in transmission process is complete */
-	  BSP_LED_On(LED1);
+//	  BSP_LED_On(LED1);
 	  wTransferState = TRANSFER_COMPLETE;
 }
 
 void tx_h_complete(DMA_HandleTypeDef *hdma)
 {
 	  /* Turn LED1 on: Transfer in transmission process is complete */
-	  BSP_LED_On(LED1);
+//	  BSP_LED_On(LED1);
 	  wTransferState = TRANSFER_H_COMPLETE;
 }
 
@@ -626,9 +634,6 @@ void HAL_UART_TxCpltCallback(UART_HandleTypeDef *UartHandle)
 {
   /* Set transmission flag: transfer complete */
   UartReady = SET;
-  /* Turn LED2 off: Transfer in transmission process is correct */
-  BSP_LED_On(LED2);
-
 }
 
 void HAL_UART_ErrorCallback(UART_HandleTypeDef *UartHandle)

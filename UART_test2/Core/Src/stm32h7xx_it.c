@@ -222,7 +222,7 @@ void DMA1_Stream0_IRQHandler(void)
   */
 void DMA1_Stream1_IRQHandler(void)
 {
-	BSP_LED_On(LED2);
+	BSP_LED_On(LED3);
   /* USER CODE BEGIN DMA1_Stream1_IRQn 0 */
 
   /* USER CODE END DMA1_Stream1_IRQn 0 */
@@ -250,14 +250,14 @@ void EXTI15_10_IRQHandler(void)
 
 void USART3_IRQHandler(void)
 {
-	BSP_LED_On(LED2);
+	BSP_LED_On(LED3);
   HAL_UART_IRQHandler(&huart3);
 }
 
 void SPI1_IRQHandler(void)
 {
+	  BSP_LED_On(LED3);
   HAL_SPI_IRQHandler(&hspi1);
-  BSP_LED_On(LED2);
 }
 
 /* USER CODE BEGIN 1 */
