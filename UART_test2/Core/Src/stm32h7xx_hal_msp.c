@@ -378,7 +378,7 @@ void HAL_UART_MspInit(UART_HandleTypeDef* huart)
 
     /* USART3 DMA Init */
     /* USART3_TX Init */
-    hdma_usart3_tx.Instance = DMA1_Stream1;
+    hdma_usart3_tx.Instance = USART3_DMA_INSTANCE;
     hdma_usart3_tx.Init.Request = DMA_REQUEST_USART3_TX;
     hdma_usart3_tx.Init.Direction = DMA_MEMORY_TO_PERIPH;
     hdma_usart3_tx.Init.PeriphInc = DMA_PINC_DISABLE;

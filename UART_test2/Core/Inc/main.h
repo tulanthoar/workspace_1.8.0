@@ -77,6 +77,7 @@ void Error_Handler(void);
 /* USER CODE BEGIN Private defines */
 #define COUNTOF(__BUFFER__)   (sizeof(__BUFFER__) / sizeof(*(__BUFFER__)))
 #define TXBUFFERSIZE                     (COUNTOF(aTxBuffer) - 1)
+#define USART3_DMA_INSTANCE DMA1_Stream1
 /* USER CODE END Private defines */
 
 #ifdef __cplusplus
