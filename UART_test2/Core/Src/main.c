@@ -79,10 +79,10 @@ enum {
 __IO ITStatus UartReady = RESET;
 __IO uint32_t UserButtonStatus = 0;  /* set to 1 after User Button interrupt  */
 ALIGN_32BYTES (__IO uint16_t aTxBuffer[1024]) = {0};
-ALIGN_32BYTES (__IO uint16_t aRxBuffer[8192]) = {0};
-float yi[8192] = {0};
+ALIGN_32BYTES (__IO uint16_t aRxBuffer[2048]) = {0};
+float yi[10240] = {0};
 __IO uint32_t wTransferState = TRANSFER_WAIT;
-#define OVERSAMPLING 4
+#define OVERSAMPLING 1
 /* USER CODE END 0 */
 
 /**
@@ -232,11 +232,10 @@ int main(void)
 	  j = rxOffset;
 	  aTxBuffer[0] = aRxBuffer[j];
 	  for( int i = 1; i < txCount; ++i ){
-		  for( int k = 0; k < OVERSAMPLING; ++k, ++j){
-			  yi[j] = aRxBuffer[j] * 1.0;
-		  }
-//		  yi[j] = aRxBuffer[j] * 1.0;
-//		  aTxBuffer[i] = (uint16_t)yi[j];
+//		  for( int k = 0; k < OVERSAMPLING; ++k, ++j){
+//			  yi[j] = aRxBuffer[j] * 1.0;
+//		  }
+		  j+= OVERSAMPLING;
 		  aTxBuffer[i] = aRxBuffer[j];
 	  }
 
@@ -251,9 +250,10 @@ int main(void)
 	  j = 0;
 	  aTxBuffer[0] = aRxBuffer[0];
 	  for( int i = 1; i < txCount; ++i){
-		  for( int k = 0; k < OVERSAMPLING; ++k, ++j){
-			  yi[j] = aRxBuffer[j] * 1.0;
-		  }
+//		  for( int k = 0; k < OVERSAMPLING; ++k, ++j){
+//			  yi[j] = aRxBuffer[j] * 1.0;
+//		  }
+		  j+= OVERSAMPLING;
 		  aTxBuffer[i] = aRxBuffer[j];
 	  }
 

@@ -34,7 +34,7 @@ const unsigned short pll3_q = 8;
 const unsigned short pll3_r = 2;
 const unsigned short pll2_m = 4;
 const unsigned short pll2_n = 279;
-const unsigned short pll2_p = 8;
+const unsigned short pll2_p = 32;
 const unsigned short pll2_q = 2;
 const unsigned short pll2_r = 2;
 
