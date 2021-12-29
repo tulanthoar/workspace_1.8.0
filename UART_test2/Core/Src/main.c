@@ -636,23 +636,19 @@ void HAL_UART_ErrorCallback(UART_HandleTypeDef *UartHandle) {
 	BSP_LED_On(LED3);
 	Error_Handler();
 }
-/* USER CODE BEGIN 4 */
-
-/* USER CODE END 4 */
 
 /**
  * @brief  This function is executed in case of error occurrence.
  * @retval None
  */
 void Error_Handler(void) {
-	/* USER CODE BEGIN Error_Handler_Debug */
-	/* User can add his own implementation to report the HAL error return state */
+//	disable interrupts
 	__disable_irq();
+//	toggle the red LED forever
 	while (1) {
 		BSP_LED_Toggle(LED3);
 		HAL_Delay(100);
 	}
-	/* USER CODE END Error_Handler_Debug */
 }
 
 #ifdef  USE_FULL_ASSERT
