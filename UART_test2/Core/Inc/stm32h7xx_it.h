@@ -55,9 +55,21 @@ void SVC_Handler(void);
 void DebugMon_Handler(void);
 void PendSV_Handler(void);
 void SysTick_Handler(void);
+// interrupt handlers for DMA requests
+// DMA1 Stream0 is for UART1
 void DMA1_Stream0_IRQHandler(void);
+// DMA1 stream1 is for UART3
 void DMA1_Stream1_IRQHandler(void);
+// DMA2 stream0 is for SPI1
+void DMA2_Stream0_IRQHandler(void);
+// DMA2 stream1 is for SPI2
+void DMA2_Stream1_IRQHandler(void);
+// interrupt handlers for peripherals
+void USART1_IRQHandler(void);
 void USART3_IRQHandler(void);
+void SPI1_IRQHandler(void);
+void SPI2_IRQHandler(void);
+
 /* USER CODE BEGIN EFP */
 
 /* USER CODE END EFP */

@@ -20,25 +20,6 @@
 #include "main.h"
 #include "string.h"
 
-/* Private includes ----------------------------------------------------------*/
-/* USER CODE BEGIN Includes */
-
-/* USER CODE END Includes */
-
-/* Private typedef -----------------------------------------------------------*/
-/* USER CODE BEGIN PTD */
-
-/* USER CODE END PTD */
-
-/* Private define ------------------------------------------------------------*/
-/* USER CODE BEGIN PD */
-/* USER CODE END PD */
-
-/* Private macro -------------------------------------------------------------*/
-/* USER CODE BEGIN PM */
-
-/* USER CODE END PM */
-
 //SPI1 is the breadboard converter
 SPI_HandleTypeDef hspi1;
 DMA_HandleTypeDef hdma_spi1_rx;
@@ -53,11 +34,6 @@ DMA_HandleTypeDef hdma_usart1_tx;
 UART_HandleTypeDef huart3;
 DMA_HandleTypeDef hdma_usart3_tx;
 
-/* USER CODE BEGIN PV */
-
-/* USER CODE END PV */
-
-/* Private function prototypes -----------------------------------------------*/
 // configure the system clock
 void SystemClock_Config(void);
 // initialize the GPIO
@@ -75,16 +51,13 @@ static void MX_USART3_UART_Init(void);
 // indicate the SPI transfer is half complete,
 // used in the first cycle before interrupts are disabled
 static void tx_h_complete(DMA_HandleTypeDef *hdma);
-/* USER CODE BEGIN PFP */
 
-/* USER CODE END PFP */
 // variable set in the tx_h_complete function
 enum {
 	TRANSFER_WAIT, TRANSFER_H_COMPLETE, TRANSFER_ERROR
 };
 __IO uint32_t wTransferState = TRANSFER_WAIT;
-/* Private user code ---------------------------------------------------------*/
-/* USER CODE BEGIN 0 */
+
 // the value of this variable is toggled when the user button is pressed
 __IO uint32_t UserButtonStatus = 0;
 // buffer used to transmit data over UART
@@ -96,7 +69,6 @@ float yi[10240] = { 0 };
 
 // The oversampling ratio
 #define OVERSAMPLING 1
-/* USER CODE END 0 */
 
 /**
  * @brief  The application entry point.
@@ -124,16 +96,9 @@ int main(void) {
 	/* Reset of all peripherals, Initializes the Flash interface and the Systick. */
 	HAL_Init();
 
-	/* USER CODE BEGIN Init */
-
-	/* USER CODE END Init */
 
 	/* Configure the system clock */
 	SystemClock_Config();
-
-	/* USER CODE BEGIN SysInit */
-
-	/* USER CODE END SysInit */
 
 //    initialize GPIO
 	MX_GPIO_Init();
@@ -150,7 +115,6 @@ int main(void) {
 	MX_SPI1_Init();
 //	initialize the SPI2 interface, going to the pcb converter
     MX_SPI2_Init();
-	/* USER CODE BEGIN 2 */
 
 //  stall until the user button is pressed
 	while (UserButtonStatus == 0) {
@@ -210,61 +174,92 @@ int main(void) {
 	BSP_LED_Off(LED1);
 	BSP_LED_Off(LED2);
 	BSP_LED_Off(LED3);
+//	transfer data from rxbuffer to tx buffer
+//	j is the index for the rx buffer
 	int j = 0;
 	aTxBuffer[0] = aRxBuffer[0];
-	for (int i = 1; i < txCount; ++i, j += OVERSAMPLING) {
+//	i is the index of the tx buffer
+//	j increases by the oversampling ratio for each inciment in i
+	for (int i = 1; i < txCount; ++i) {
 		j += OVERSAMPLING;
 		aTxBuffer[i] = aRxBuffer[j];
 	}
+//	Use the HAL driver to transmit the buffer over DMA
+//	HAL will initialize many of the settings for us
 	if (HAL_UART_Transmit_DMA(&huart3, (uint8_t*) aTxBuffer, sizeof(aTxBuffer))
 			!= HAL_OK) {
+//		if it fails, call our error handler
 		Error_Handler();
 	}
+//	Suspend interupts that we no longer need, for the purpose of efficiency
+//	suspend the systick
 	HAL_SuspendTick();
+//	suspend UART3 interupts
 	HAL_NVIC_DisableIRQ(USART3_IRQn);
+//	suspend DMA interupts for the UART3 channel
 	HAL_NVIC_DisableIRQ(USART3_DMA_IRQN);
+//	suspend DMA interrupts for the SPI channel
 	HAL_NVIC_DisableIRQ(SPI1_DMA_IRQN);
+//	reset LEDs
+	BSP_LED_Off(LED1);
+	BSP_LED_Off(LED2);
 	BSP_LED_Off(LED3);
 
 	/* Infinite loop */
 	/* USER CODE BEGIN WHILE */
 	while (1) {
+//		wait for the second half of the receive buffer to finish transferring
 		while ((DMA2->LISR & DMA_FLAG_TCIF0_4) != DMA_FLAG_TCIF0_4) { }
+//		clear the transfer complete flag of the SPI channel
 		DMA2->LIFCR = DMA_FLAG_TCIF0_4;
+//		the rx buffer index starts at half way through the buffer and goes to the end
 		j = rxOffset;
 		aTxBuffer[0] = aRxBuffer[j];
 		for (int i = 1; i < txCount; ++i) {
 			//		  for( int k = 0; k < OVERSAMPLING; ++k, ++j){
 			//			  yi[j] = aRxBuffer[j] * 1.0;
 			//		  }
+//			j increases by the oversampling ratio for every increment in i
 			j += OVERSAMPLING;
 			aTxBuffer[i] = aRxBuffer[j];
 		}
 
+//		wait for the UART to finish transferring
 		while ((USART3->ISR & UART_FLAG_TC) != UART_FLAG_TC) { }
+//		reset the UART transfer complete flag
 		USART3->ICR = UART_CLEAR_TCF;
+//		reset the UART's DMA channel transfer complete and half transfer flags
 		DMA1->LIFCR = DMA_FLAG_TCIF1_5 | DMA_FLAG_HTIF1_5;
+//		reenable the UART DMA channel
 		SET_BIT(USART3_DMA_INSTANCE->CR, (DMA_SxCR_EN));
+//		start the UART DMA transfer
 		SET_BIT(USART3->CR3, USART_CR3_DMAT);
 
-		while ((DMA2->LISR & DMA_FLAG_HTIF0_4) != DMA_FLAG_HTIF0_4) {
-		}
+//		wait for the first half of the receive buffer to be ready
+		while ((DMA2->LISR & DMA_FLAG_HTIF0_4) != DMA_FLAG_HTIF0_4) {}
+//		reset the SPI DMA channel half transfer flag
 		DMA2->LIFCR = DMA_FLAG_HTIF0_4;
+//		the starting index for the recieve buffer is 0
 		j = 0;
 		aTxBuffer[0] = aRxBuffer[0];
 		for (int i = 1; i < txCount; ++i) {
 			//		  for( int k = 0; k < OVERSAMPLING; ++k, ++j){
 			//			  yi[j] = aRxBuffer[j] * 1.0;
 			//		  }
+//            j increases by the oversampling ratio for each increment of i
 			j += OVERSAMPLING;
 			aTxBuffer[i] = aRxBuffer[j];
 		}
 
-		while ((USART3->ISR & UART_FLAG_TC) != UART_FLAG_TC) {
-		}
+//		wait for the UART to finish transferring
+		while ((USART3->ISR & UART_FLAG_TC) != UART_FLAG_TC) {}
+//		clear the transfer complete flag of the UART
 		USART3->ICR = UART_CLEAR_TCF;
+//		clear the transfer complete and half transfer flags of the UART DMA channel
 		DMA1->LIFCR = DMA_FLAG_TCIF1_5 | DMA_FLAG_HTIF1_5;
+//		enable the UART DMA channel
 		SET_BIT(USART3_DMA_INSTANCE->CR, (DMA_SxCR_EN));
+//		start the UART DMA transfer
 		SET_BIT(USART3->CR3, USART_CR3_DMAT);
 	}
 }
@@ -330,44 +325,54 @@ void SystemClock_Config(void) {
 
 static void MX_SPI1_Init(void) {
 
-	/* USER CODE BEGIN SPI1_Init 0 */
-
-	/* USER CODE END SPI1_Init 0 */
-
-	/* USER CODE BEGIN SPI1_Init 1 */
-
-	/* USER CODE END SPI1_Init 1 */
 	/* SPI1 parameter configuration*/
 	hspi1.Instance = SPI1;
+//	set mode to master
 	hspi1.Init.Mode = SPI_MODE_MASTER;
+//	recieve only
 	hspi1.Init.Direction = SPI_DIRECTION_2LINES_RXONLY;
+//	14 data bits, which includes the 2 leading 0s
 	hspi1.Init.DataSize = SPI_DATASIZE_14BIT;
+//	clock polarity is high
 	hspi1.Init.CLKPolarity = SPI_POLARITY_HIGH;
+//	data is clocked on the first edge
 	hspi1.Init.CLKPhase = SPI_PHASE_1EDGE;
+//	slave select is managed by hardware
 	hspi1.Init.NSS = SPI_NSS_HARD_OUTPUT;
+//	peripheral clock rate is half of pll clock
 	hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_2;
+//	MSB transferred first
 	hspi1.Init.FirstBit = SPI_FIRSTBIT_MSB;
+//	not TI mode
 	hspi1.Init.TIMode = SPI_TIMODE_DISABLE;
+//	no CRC
 	hspi1.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
 	hspi1.Init.CRCPolynomial = 0x0;
-	hspi1.Init.NSSPMode = SPI_NSS_PULSE_ENABLE;
-	hspi1.Init.NSSPolarity = SPI_NSS_POLARITY_LOW;
-	hspi1.Init.FifoThreshold = SPI_FIFO_THRESHOLD_01DATA;
 	hspi1.Init.TxCRCInitializationPattern =
 			SPI_CRC_INITIALIZATION_ALL_ZERO_PATTERN;
 	hspi1.Init.RxCRCInitializationPattern =
 			SPI_CRC_INITIALIZATION_ALL_ZERO_PATTERN;
+//	the slave select pin will pulse inactive in between frames
+//	the length of the pulse is 1 cycle
+	hspi1.Init.NSSPMode = SPI_NSS_PULSE_ENABLE;
+//	slave select active low
+	hspi1.Init.NSSPolarity = SPI_NSS_POLARITY_LOW;
+//	request data transfer function after 1 data
+	hspi1.Init.FifoThreshold = SPI_FIFO_THRESHOLD_01DATA;
+//	no idle time before first transfer
 	hspi1.Init.MasterSSIdleness = SPI_MASTER_SS_IDLENESS_00CYCLE;
+//	spend two idle cycles between transfers, the slave select is high for one of these cycles
 	hspi1.Init.MasterInterDataIdleness = SPI_MASTER_INTERDATA_IDLENESS_02CYCLE;
+//	no auto suspend on overflow
 	hspi1.Init.MasterReceiverAutoSusp = SPI_MASTER_RX_AUTOSUSP_DISABLE;
+//	don't fix IO state
 	hspi1.Init.MasterKeepIOState = SPI_MASTER_KEEP_IO_STATE_DISABLE;
+//	don't swap MISO and MOSI
 	hspi1.Init.IOSwap = SPI_IO_SWAP_DISABLE;
+//	initialize SPI with HAL library
 	if (HAL_SPI_Init(&hspi1) != HAL_OK) {
 		Error_Handler();
 	}
-	/* USER CODE BEGIN SPI1_Init 2 */
-
-	/* USER CODE END SPI1_Init 2 */
 
 }
 
@@ -378,44 +383,54 @@ static void MX_SPI1_Init(void) {
  */
 static void MX_SPI2_Init(void) {
 
-	/* USER CODE BEGIN SPI2_Init 0 */
-
-	/* USER CODE END SPI2_Init 0 */
-
-	/* USER CODE BEGIN SPI2_Init 1 */
-
-	/* USER CODE END SPI2_Init 1 */
-	/* SPI2 parameter configuration*/
-	hspi2.Instance = SPI2;
+	/* SPI1 parameter configuration*/
+	hspi2.Instance = SPI1;
+//	set mode to master
 	hspi2.Init.Mode = SPI_MODE_MASTER;
-	hspi2.Init.Direction = SPI_DIRECTION_2LINES;
-	hspi2.Init.DataSize = SPI_DATASIZE_16BIT;
-	hspi2.Init.CLKPolarity = SPI_POLARITY_LOW;
+//	recieve only
+	hspi2.Init.Direction = SPI_DIRECTION_2LINES_RXONLY;
+//	14 data bits, which includes the 2 leading 0s
+	hspi2.Init.DataSize = SPI_DATASIZE_14BIT;
+//	clock polarity is high
+	hspi2.Init.CLKPolarity = SPI_POLARITY_HIGH;
+//	data is clocked on the first edge
 	hspi2.Init.CLKPhase = SPI_PHASE_1EDGE;
+//	slave select is managed by hardware
 	hspi2.Init.NSS = SPI_NSS_HARD_OUTPUT;
+//	peripheral clock rate is half of pll clock
 	hspi2.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_2;
+//	MSB transferred first
 	hspi2.Init.FirstBit = SPI_FIRSTBIT_MSB;
+//	not TI mode
 	hspi2.Init.TIMode = SPI_TIMODE_DISABLE;
+//	no CRC
 	hspi2.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
 	hspi2.Init.CRCPolynomial = 0x0;
-	hspi2.Init.NSSPMode = SPI_NSS_PULSE_ENABLE;
-	hspi2.Init.NSSPolarity = SPI_NSS_POLARITY_LOW;
-	hspi2.Init.FifoThreshold = SPI_FIFO_THRESHOLD_01DATA;
 	hspi2.Init.TxCRCInitializationPattern =
 			SPI_CRC_INITIALIZATION_ALL_ZERO_PATTERN;
 	hspi2.Init.RxCRCInitializationPattern =
 			SPI_CRC_INITIALIZATION_ALL_ZERO_PATTERN;
+//	the slave select pin will pulse inactive in between frames
+//	the length of the pulse is 1 cycle
+	hspi2.Init.NSSPMode = SPI_NSS_PULSE_ENABLE;
+//	slave select active low
+	hspi2.Init.NSSPolarity = SPI_NSS_POLARITY_LOW;
+//	request data transfer function after 1 data
+	hspi2.Init.FifoThreshold = SPI_FIFO_THRESHOLD_01DATA;
+//	no idle time before first transfer
 	hspi2.Init.MasterSSIdleness = SPI_MASTER_SS_IDLENESS_00CYCLE;
-	hspi2.Init.MasterInterDataIdleness = SPI_MASTER_INTERDATA_IDLENESS_00CYCLE;
+//	spend two idle cycles between transfers, the slave select is high for one of these cycles
+	hspi2.Init.MasterInterDataIdleness = SPI_MASTER_INTERDATA_IDLENESS_02CYCLE;
+//	no auto suspend on overflow
 	hspi2.Init.MasterReceiverAutoSusp = SPI_MASTER_RX_AUTOSUSP_DISABLE;
+//	don't fix IO state
 	hspi2.Init.MasterKeepIOState = SPI_MASTER_KEEP_IO_STATE_DISABLE;
+//	don't swap MISO and MOSI
 	hspi2.Init.IOSwap = SPI_IO_SWAP_DISABLE;
+//	initialize SPI with HAL library
 	if (HAL_SPI_Init(&hspi2) != HAL_OK) {
 		Error_Handler();
 	}
-	/* USER CODE BEGIN SPI2_Init 2 */
-
-	/* USER CODE END SPI2_Init 2 */
 
 }
 
