@@ -441,42 +441,46 @@ static void MX_SPI2_Init(void) {
  */
 static void MX_USART1_UART_Init(void) {
 
-	/* USER CODE BEGIN USART1_Init 0 */
-
-	/* USER CODE END USART1_Init 0 */
-
-	/* USER CODE BEGIN USART1_Init 1 */
-
-	/* USER CODE END USART1_Init 1 */
 	huart1.Instance = USART1;
-	huart1.Init.BaudRate = 12000000;
+//	baud rate is peripheral clock divided by 8, check the ioc file
+	huart1.Init.BaudRate = 11978688;
+//	8 bits per word
 	huart1.Init.WordLength = UART_WORDLENGTH_8B;
+//	1 stop bit
 	huart1.Init.StopBits = UART_STOPBITS_1;
+//	no parity check
 	huart1.Init.Parity = UART_PARITY_NONE;
+//	UART in both transmit and receive
 	huart1.Init.Mode = UART_MODE_TX_RX;
+//	no HW flow control
 	huart1.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+//	oversample by 8
 	huart1.Init.OverSampling = UART_OVERSAMPLING_8;
 	huart1.Init.OneBitSampling = UART_ONE_BIT_SAMPLE_DISABLE;
+//	divide the peripheral clock by 1
 	huart1.Init.ClockPrescaler = UART_PRESCALER_DIV1;
+//	no advanced features
 	huart1.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_NO_INIT;
+//	initialize peripheral with HAL library
 	if (HAL_UART_Init(&huart1) != HAL_OK) {
 		Error_Handler();
 	}
+//	initialize transfer fifo
 	if (HAL_UARTEx_SetTxFifoThreshold(&huart1, UART_TXFIFO_THRESHOLD_1_8)
 			!= HAL_OK) {
 		Error_Handler();
 	}
+//	initialize receive fifo
 	if (HAL_UARTEx_SetRxFifoThreshold(&huart1, UART_RXFIFO_THRESHOLD_1_8)
 			!= HAL_OK) {
 		Error_Handler();
 	}
+//	enable fifo
 	if (HAL_UARTEx_EnableFifoMode(&huart1) != HAL_OK) {
 		Error_Handler();
 	}
-	/* USER CODE BEGIN USART1_Init 2 */
-
-	/* USER CODE END USART1_Init 2 */
-
+	HAL_NVIC_SetPriority(USART1_IRQn, 0, 1);
+	HAL_NVIC_EnableIRQ(USART1_IRQn);
 }
 
 /**
@@ -485,44 +489,47 @@ static void MX_USART1_UART_Init(void) {
  * @retval None
  */
 static void MX_USART3_UART_Init(void) {
-	/* USER CODE BEGIN USART3_Init 0 */
 
-	/* USER CODE END USART3_Init 0 */
-
-	/* USER CODE BEGIN USART3_Init 1 */
-
-	/* USER CODE END USART3_Init 1 */
 	huart3.Instance = USART3;
-	huart3.Init.BaudRate = 11978688;
-	huart3.Init.WordLength = UART_WORDLENGTH_8B;
-	huart3.Init.StopBits = UART_STOPBITS_1;
-	huart3.Init.Parity = UART_PARITY_NONE;
-	huart3.Init.Mode = UART_MODE_TX_RX;
-	huart3.Init.HwFlowCtl = UART_HWCONTROL_NONE;
-	huart3.Init.OverSampling = UART_OVERSAMPLING_8;
-	huart3.Init.OneBitSampling = UART_ONE_BIT_SAMPLE_DISABLE;
-	huart3.Init.ClockPrescaler = UART_PRESCALER_DIV1;
-	huart3.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_MSBFIRST_INIT;
-	huart3.AdvancedInit.MSBFirst = UART_ADVFEATURE_MSBFIRST_DISABLE;
-	if (HAL_UART_Init(&huart3) != HAL_OK) {
-		Error_Handler();
-	}
-	if (HAL_UARTEx_SetTxFifoThreshold(&huart3, UART_TXFIFO_THRESHOLD_1_8)
-			!= HAL_OK) {
-		Error_Handler();
-	}
-	if (HAL_UARTEx_SetRxFifoThreshold(&huart3, UART_RXFIFO_THRESHOLD_1_8)
-			!= HAL_OK) {
-		Error_Handler();
-	}
-	if (HAL_UARTEx_EnableFifoMode(&huart3) != HAL_OK) {
-		Error_Handler();
-	}
-	/* USER CODE BEGIN USART3_Init 2 */
-
-	/* USER CODE END USART3_Init 2 */
-	HAL_NVIC_SetPriority(USART3_IRQn, 0, 1);
-	HAL_NVIC_EnableIRQ(USART3_IRQn);
+	//	baud rate is peripheral clock divided by 8, check the ioc file
+		huart3.Init.BaudRate = 11978688;
+	//	8 bits per word
+		huart3.Init.WordLength = UART_WORDLENGTH_8B;
+	//	1 stop bit
+		huart3.Init.StopBits = UART_STOPBITS_1;
+	//	no parity check
+		huart3.Init.Parity = UART_PARITY_NONE;
+	//	UART in both transmit and receive
+		huart3.Init.Mode = UART_MODE_TX_RX;
+	//	no HW flow control
+		huart3.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+	//	oversample by 8
+		huart3.Init.OverSampling = UART_OVERSAMPLING_8;
+		huart3.Init.OneBitSampling = UART_ONE_BIT_SAMPLE_DISABLE;
+	//	divide the peripheral clock by 1
+		huart3.Init.ClockPrescaler = UART_PRESCALER_DIV1;
+	//	no advanced features
+		huart3.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_NO_INIT;
+	//	initialize peripheral with HAL library
+		if (HAL_UART_Init(&huart3) != HAL_OK) {
+			Error_Handler();
+		}
+	//	initialize transfer fifo
+		if (HAL_UARTEx_SetTxFifoThreshold(&huart3, UART_TXFIFO_THRESHOLD_1_8)
+				!= HAL_OK) {
+			Error_Handler();
+		}
+	//	initialize receive fifo
+		if (HAL_UARTEx_SetRxFifoThreshold(&huart3, UART_RXFIFO_THRESHOLD_1_8)
+				!= HAL_OK) {
+			Error_Handler();
+		}
+	//	enable fifo
+		if (HAL_UARTEx_EnableFifoMode(&huart3) != HAL_OK) {
+			Error_Handler();
+		}
+		HAL_NVIC_SetPriority(USART3_IRQn, 0, 1);
+		HAL_NVIC_EnableIRQ(USART3_IRQn);
 }
 
 /**
@@ -541,9 +548,13 @@ static void MX_DMA_Init(void) {
 	/* DMA1_Stream1_IRQn interrupt configuration */
 	HAL_NVIC_SetPriority(DMA1_Stream1_IRQn, 0, 1);
 	HAL_NVIC_EnableIRQ(DMA1_Stream1_IRQn);
-	/* DMA1_Stream2_IRQn interrupt configuration */
+	/* DMA2_Stream0_IRQn interrupt configuration */
 	HAL_NVIC_SetPriority(DMA2_Stream0_IRQn, 0, 1);
 	HAL_NVIC_EnableIRQ(DMA2_Stream0_IRQn);
+	/* DMA2_Stream1_IRQn interrupt configuration */
+	HAL_NVIC_SetPriority(DMA2_Stream1_IRQn, 0, 1);
+	HAL_NVIC_EnableIRQ(DMA2_Stream1_IRQn);
+
 
 }
 
@@ -596,12 +607,15 @@ static void MX_GPIO_Init(void) {
 	BSP_PB_Init(BUTTON_USER, BUTTON_MODE_EXTI);
 }
 
+// callback function for external GPIO interrupt
+// toggles the value of UserButtonStatus
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
 	if (GPIO_Pin == BUTTON_USER_PIN) {
 		UserButtonStatus ^= 1;
 	}
 }
 
+// callback for SPI DMA half transfer complete
 void tx_h_complete(DMA_HandleTypeDef *hdma) {
 	wTransferState = TRANSFER_H_COMPLETE;
 }
@@ -615,6 +629,7 @@ void tx_h_complete(DMA_HandleTypeDef *hdma) {
  */
 void HAL_SPI_ErrorCallback(SPI_HandleTypeDef *hspi) {
 	wTransferState = TRANSFER_ERROR;
+	Error_Handler();
 }
 
 void HAL_UART_ErrorCallback(UART_HandleTypeDef *UartHandle) {

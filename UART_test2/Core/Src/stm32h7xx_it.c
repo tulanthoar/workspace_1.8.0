@@ -20,53 +20,20 @@
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 #include "stm32h7xx_it.h"
-/* Private includes ----------------------------------------------------------*/
-/* USER CODE BEGIN Includes */
-/* USER CODE END Includes */
 
-/* Private typedef -----------------------------------------------------------*/
-/* USER CODE BEGIN TD */
-
-/* USER CODE END TD */
-
-/* Private define ------------------------------------------------------------*/
-/* USER CODE BEGIN PD */
-
-/* USER CODE END PD */
-
-/* Private macro -------------------------------------------------------------*/
-/* USER CODE BEGIN PM */
-
-/* USER CODE END PM */
-
-/* Private variables ---------------------------------------------------------*/
-/* USER CODE BEGIN PV */
-
-/* USER CODE END PV */
-
-/* Private function prototypes -----------------------------------------------*/
-/* USER CODE BEGIN PFP */
-
-/* USER CODE END PFP */
-
-/* Private user code ---------------------------------------------------------*/
-/* USER CODE BEGIN 0 */
-
-/* USER CODE END 0 */
-
-/* External variables --------------------------------------------------------*/
-extern DMA_HandleTypeDef hdma_usart1_tx;
-extern DMA_HandleTypeDef hdma_usart3_tx;
-extern UART_HandleTypeDef huart3;
-extern UART_HandleTypeDef huart1;
-extern DMA_HandleTypeDef hdma_spi1_rx;
-extern DMA_HandleTypeDef hdma_spi2_rx;
+//SPI1 is the breadboard converter
 extern SPI_HandleTypeDef hspi1;
+extern DMA_HandleTypeDef hdma_spi1_rx;
+// SPI2 is the PCB converter
 extern SPI_HandleTypeDef hspi2;
-extern uint32_t wTransferState;
-/* USER CODE BEGIN EV */
+extern DMA_HandleTypeDef hdma_spi2_rx;
 
-/* USER CODE END EV */
+//UART1 is the FT232 interface
+extern UART_HandleTypeDef huart1;
+extern DMA_HandleTypeDef hdma_usart1_tx;
+//UART3 is the STLINK interface
+extern UART_HandleTypeDef huart3;
+extern DMA_HandleTypeDef hdma_usart3_tx;
 
 /******************************************************************************/
 /*           Cortex Processor Interruption and Exception Handlers          */
@@ -196,7 +163,9 @@ void SysTick_Handler(void) {
  * @brief This function handles DMA1 stream0 global interrupt.
  */
 void DMA1_Stream0_IRQHandler(void) {
+//	turn on the red LED
 	BSP_LED_On(LED3);
+//	call the HAL library interrupt handler
 	HAL_DMA_IRQHandler(&hdma_usart1_tx);
 }
 
@@ -204,45 +173,78 @@ void DMA1_Stream0_IRQHandler(void) {
  * @brief This function handles DMA1 stream1 global interrupt.
  */
 void DMA1_Stream1_IRQHandler(void) {
+	//	turn on the red LED
 	BSP_LED_On(LED3);
-	DMA1->LIFCR = DMA_FLAG_TCIF1_5 | DMA_FLAG_HTIF1_5;
+	//	call the HAL library interrupt handler
+	HAL_DMA_IRQHandler(&hdma_usart3_tx);
 }
 
+/**
+ * @brief This function handles DMA2 stream0 global interrupt.
+ */
 void DMA2_Stream0_IRQHandler(void) {
+	//	turn on the red LED
 	BSP_LED_On(LED3);
+	//	call the HAL library interrupt handler
 	HAL_DMA_IRQHandler(&hdma_spi1_rx);
 }
 
+/**
+ * @brief This function handles DMA2 stream1 global interrupt.
+ */
 void DMA2_Stream1_IRQHandler(void) {
+	//	turn on the red LED
 	BSP_LED_On(LED3);
+	//	call the HAL library interrupt handler
 	HAL_DMA_IRQHandler(&hdma_spi2_rx);
 }
 
+/**
+ * @brief This function handles external GPIO global interrupt for user button.
+ */
 void EXTI15_10_IRQHandler(void) {
+
+	//	call the HAL library interrupt handler
 	HAL_GPIO_EXTI_IRQHandler(BUTTON_USER_PIN);
 }
 
+/**
+ * @brief This function handles USART1 global interrupt.
+ */
 void USART1_IRQHandler(void) {
+	//	turn on the red LED
 	BSP_LED_On(LED3);
+	//	call the HAL library interrupt handler
 	HAL_UART_IRQHandler(&huart1);
 }
 
+/**
+ * @brief This function handles USART3 global interrupt.
+ */
 void USART3_IRQHandler(void) {
+	//	turn on the red LED
 	BSP_LED_On(LED3);
+	//	call the HAL library interrupt handler
 	HAL_UART_IRQHandler(&huart3);
 }
 
+/**
+ * @brief This function handles SPI1 global interrupt.
+ */
 void SPI1_IRQHandler(void) {
+	//	turn on the red LED
 	BSP_LED_On(LED3);
+	//	call the HAL library interrupt handler
 	HAL_SPI_IRQHandler(&hspi1);
 }
 
+/**
+ * @brief This function handles SPI2 global interrupt.
+ */
 void SPI2_IRQHandler(void) {
+	//	turn on the red LED
 	BSP_LED_On(LED3);
+	//	call the HAL library interrupt handler
 	HAL_SPI_IRQHandler(&hspi2);
 }
-
-/* USER CODE BEGIN 1 */
-
-/* USER CODE END 1 */
 
