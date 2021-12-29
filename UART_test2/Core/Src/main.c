@@ -39,45 +39,62 @@
 
 /* USER CODE END PM */
 
-SPI_HandleTypeDef hspi2;
+//SPI1 is the breadboard converter
 SPI_HandleTypeDef hspi1;
 DMA_HandleTypeDef hdma_spi1_rx;
+// SPI2 is the PCB converter
+SPI_HandleTypeDef hspi2;
+DMA_HandleTypeDef hdma_spi2_rx;
 
+//UART1 is the FT232 interface
 UART_HandleTypeDef huart1;
-UART_HandleTypeDef huart3;
 DMA_HandleTypeDef hdma_usart1_tx;
+//UART3 is the STLINK interface
+UART_HandleTypeDef huart3;
 DMA_HandleTypeDef hdma_usart3_tx;
-
-PCD_HandleTypeDef hpcd_USB_OTG_FS;
 
 /* USER CODE BEGIN PV */
 
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
+// configure the system clock
 void SystemClock_Config(void);
+// initialize the GPIO
 static void MX_GPIO_Init(void);
-//static void MX_USART1_UART_Init(void);
-static void MX_USART3_UART_Init(void);
-static void MX_SPI1_Init(void);
-//static void MX_SPI2_Init(void);
+// initialize the DMA controllers
 static void MX_DMA_Init(void);
-static void tx_complete(DMA_HandleTypeDef *hdma);
+// initialize the breadboard converter
+static void MX_SPI1_Init(void);
+// initialize the PCB converter
+static void MX_SPI2_Init(void);
+// initialize the FT232 UART
+static void MX_USART1_UART_Init(void);
+// initialize the STLINK UART
+static void MX_USART3_UART_Init(void);
+// indicate the SPI transfer is half complete,
+// used in the first cycle before interrupts are disabled
 static void tx_h_complete(DMA_HandleTypeDef *hdma);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
+// variable set in the tx_h_complete function
 enum {
-	TRANSFER_WAIT, TRANSFER_COMPLETE, TRANSFER_H_COMPLETE, TRANSFER_ERROR
+	TRANSFER_WAIT, TRANSFER_H_COMPLETE, TRANSFER_ERROR
 };
+__IO uint32_t wTransferState = TRANSFER_WAIT;
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-__IO ITStatus UartReady = RESET;
-__IO uint32_t UserButtonStatus = 0; /* set to 1 after User Button interrupt  */
+// the value of this variable is toggled when the user button is pressed
+__IO uint32_t UserButtonStatus = 0;
+// buffer used to transmit data over UART
 ALIGN_32BYTES (__IO uint16_t aTxBuffer[1024]) = {0};
+// buffer used to receive data over SPI
 ALIGN_32BYTES (__IO uint16_t aRxBuffer[2048]) = {0};
+// array to store output values of iir filter, not currently implimented
 float yi[10240] = { 0 };
-__IO uint32_t wTransferState = TRANSFER_WAIT;
+
+// The oversampling ratio
 #define OVERSAMPLING 1
 /* USER CODE END 0 */
 
@@ -86,17 +103,20 @@ __IO uint32_t wTransferState = TRANSFER_WAIT;
  * @retval int
  */
 int main(void) {
+//	length of the recieve buffer array
 	unsigned short rxCount = COUNTOF(aRxBuffer);
+//	length of a half transfer of recieve buffer
 	unsigned short rxOffset = rxCount / 2;
+//	length of transmit buffer
 	unsigned short txCount = COUNTOF(aTxBuffer);
-	/* USER CODE BEGIN 1 */
+//	set the transmit buffer to a known value
 	for (int i = 0; i < txCount; ++i) {
 		aTxBuffer[i] = i % 16384;
 	}
-	/* USER CODE END 1 */
 
 	/* Enable I-Cache---------------------------------------------------------*/
 	SCB_EnableICache();
+//	Enabling the data cache gives incorrect results
 	//  SCB_EnableDCache();
 
 	/* MCU Configuration--------------------------------------------------------*/
@@ -115,78 +135,58 @@ int main(void) {
 
 	/* USER CODE END SysInit */
 
-	/* Initialize all configured peripherals */
+//    initialize GPIO
 	MX_GPIO_Init();
+//	initialize the compensation cell to improve slew rate
 	HAL_EnableCompensationCell();
+//	initialize the DMA, must be done before other peripherals
 	MX_DMA_Init();
-	//  MX_USART1_UART_Init();
+//	initialize UART1, going to the ft232 interface
+	MX_USART1_UART_Init();
+//	initialize URT3, going to the STLINK interface
 	MX_USART3_UART_Init();
-	MX_SPI1_Init();
-	//  MX_SPI2_Init();
-	/* USER CODE BEGIN 2 */
-	/* Configure User push-button in Interrupt mode */
 
+//	initialize SPI1 interface, going to the breadboard converter
+	MX_SPI1_Init();
+//	initialize the SPI2 interface, going to the pcb converter
+    MX_SPI2_Init();
+	/* USER CODE BEGIN 2 */
+
+//  stall until the user button is pressed
 	while (UserButtonStatus == 0) {
 		BSP_LED_Toggle(LED1);
 		HAL_Delay(100);
 	}
+//	reset the user button status
 	UserButtonStatus = 0;
-	uint32_t tickstart = HAL_GetTick();
-	for (int i = 0; i < COUNTOF(aTxBuffer); ++i) {
-		if (UART_WaitOnFlagUntilTimeout(&huart3, UART_FLAG_TXE, RESET,
-				tickstart, 50000) != HAL_OK) {
-			return HAL_TIMEOUT;
-		}
-		huart3.Instance->TDR = aTxBuffer[i] & 0xFFU;
-		if (UART_WaitOnFlagUntilTimeout(&huart3, UART_FLAG_TXE, RESET,
-				tickstart, 50000) != HAL_OK) {
-			return HAL_TIMEOUT;
-		}
-		huart3.Instance->TDR = (aTxBuffer[i] & 0xFF00U) >> 8;
-	}
-	if (UART_WaitOnFlagUntilTimeout(&huart3, UART_FLAG_TC, RESET, tickstart,
-			50000) != HAL_OK) {
-		return HAL_TIMEOUT;
-	}
-	BSP_LED_Off(LED1);
-	while (UserButtonStatus == 0) {
-		BSP_LED_Toggle(LED2);
-		HAL_Delay(100);
-	}
-	UserButtonStatus = 0;
-	UartReady = RESET;
+//	reset LEDS
 	BSP_LED_Off(LED1);
 	BSP_LED_Off(LED2);
-	/* Process Locked */
-	__HAL_LOCK(&hspi1);
+	BSP_LED_Off(LED3);
 
 	/* Configure communication direction : 1Line */
-	if (hspi1.Init.Direction == SPI_DIRECTION_1LINE) {
-		SPI_1LINE_RX(&hspi1);
-	}
+	SPI_1LINE_RX(&hspi1);
 
-	/* Clear RXDMAEN bit */
-	CLEAR_BIT(hspi1.Instance->CFG1, SPI_CFG1_RXDMAEN);
-
-	/* Set the SPI Rx DMA transfer complete callback */
-	hspi1.hdmarx->XferCpltCallback = tx_complete;
+//	configure the half transfer callback function to update the wTransferState value
 	hspi1.hdmarx->XferHalfCpltCallback = tx_h_complete;
 
-	MODIFY_REG(((DMA_Stream_TypeDef* )hdma_spi1_rx.Instance)->CR,
-			(DMA_IT_TC | DMA_IT_HT), (DMA_IT_TC | DMA_IT_HT));
-	/* Enable the Rx DMA Stream/Channel  */
-	if (HAL_OK
-			!= HAL_DMA_Start(hspi1.hdmarx, (uint32_t) &hspi1.Instance->RXDR,
-					(uint32_t) aRxBuffer, rxCount)) {
-		/* Update SPI error code */
+//	enable the transfer complete and half transfer interupts for SPI1
+	SET_BIT(SPI1_DMA_INSTANCE->CR, DMA_IT_TC | DMA_IT_HT);
+//	start the DMA transfer on SPI1, use HAL library to perform initial configurations
+	if (HAL_DMA_Start(hspi1.hdmarx, (uint32_t) &hspi1.Instance->RXDR,
+					(uint32_t) aRxBuffer, rxCount) != HAL_OK) {
+//		if the DMA initalization was not OK, set the error bit
 		SET_BIT(hspi1.ErrorCode, HAL_SPI_ERROR_DMA);
+//		reset SPI ready state
 		hspi1.State = HAL_SPI_STATE_READY;
+//		call our custom error handler
 		Error_Handler();
 	}
 
+//	set the transfer size to 0 (unlimited)
 	MODIFY_REG(hspi1.Instance->CR2, SPI_CR2_TSIZE, 0UL);
 
-	/* Enable Rx DMA Request */
+//	enable DMA requests on the SPI instance
 	SET_BIT(hspi1.Instance->CFG1, SPI_CFG1_RXDMAEN);
 
 	/* Enable the SPI Error Interrupt Bit */
@@ -195,12 +195,21 @@ int main(void) {
 	/* Enable SPI peripheral */
 	__HAL_SPI_ENABLE(&hspi1);
 
+//	start the SPI transfers
 	SET_BIT(hspi1.Instance->CR1, SPI_CR1_CSTART);
 
+//	wait for the first half of the transfer to complete
 	while (wTransferState != TRANSFER_H_COMPLETE) {
+//		toggle LED2 every 20 ms
+		HAL_Delay(20);
 		BSP_LED_Toggle(LED3);
 	}
+//	reset transfer state
 	wTransferState = TRANSFER_WAIT;
+//	reset LEDs
+	BSP_LED_Off(LED1);
+	BSP_LED_Off(LED2);
+	BSP_LED_Off(LED3);
 	int j = 0;
 	aTxBuffer[0] = aRxBuffer[0];
 	for (int i = 1; i < txCount; ++i, j += OVERSAMPLING) {
@@ -220,8 +229,7 @@ int main(void) {
 	/* Infinite loop */
 	/* USER CODE BEGIN WHILE */
 	while (1) {
-		while ((DMA2->LISR & DMA_FLAG_TCIF0_4) != DMA_FLAG_TCIF0_4) {
-		}
+		while ((DMA2->LISR & DMA_FLAG_TCIF0_4) != DMA_FLAG_TCIF0_4) { }
 		DMA2->LIFCR = DMA_FLAG_TCIF0_4;
 		j = rxOffset;
 		aTxBuffer[0] = aRxBuffer[j];
@@ -233,8 +241,7 @@ int main(void) {
 			aTxBuffer[i] = aRxBuffer[j];
 		}
 
-		while ((USART3->ISR & UART_FLAG_TC) != UART_FLAG_TC) {
-		}
+		while ((USART3->ISR & UART_FLAG_TC) != UART_FLAG_TC) { }
 		USART3->ICR = UART_CLEAR_TCF;
 		DMA1->LIFCR = DMA_FLAG_TCIF1_5 | DMA_FLAG_HTIF1_5;
 		SET_BIT(USART3_DMA_INSTANCE->CR, (DMA_SxCR_EN));
@@ -580,22 +587,7 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
 	}
 }
 
-//void HAL_SPI_RxCpltCallback(SPI_HandleTypeDef *hspi)
-//{
-//  /* Turn LED1 on: Transfer in transmission process is complete */
-//  BSP_LED_On(LED1);
-//  wTransferState = TRANSFER_COMPLETE;
-//}
-
-void tx_complete(DMA_HandleTypeDef *hdma) {
-	/* Turn LED1 on: Transfer in transmission process is complete */
-	//	  BSP_LED_On(LED1);
-	wTransferState = TRANSFER_COMPLETE;
-}
-
 void tx_h_complete(DMA_HandleTypeDef *hdma) {
-	/* Turn LED1 on: Transfer in transmission process is complete */
-	//	  BSP_LED_On(LED1);
 	wTransferState = TRANSFER_H_COMPLETE;
 }
 
@@ -608,11 +600,6 @@ void tx_h_complete(DMA_HandleTypeDef *hdma) {
  */
 void HAL_SPI_ErrorCallback(SPI_HandleTypeDef *hspi) {
 	wTransferState = TRANSFER_ERROR;
-}
-
-void HAL_UART_TxCpltCallback(UART_HandleTypeDef *UartHandle) {
-	/* Set transmission flag: transfer complete */
-	UartReady = SET;
 }
 
 void HAL_UART_ErrorCallback(UART_HandleTypeDef *UartHandle) {

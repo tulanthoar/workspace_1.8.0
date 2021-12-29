@@ -1,6 +1,5 @@
 Core/Src/stm32h7xx_nucleo.o: ../Core/Src/stm32h7xx_nucleo.c \
- C:/Users/natha/STM32Cube/Repository/STM32Cube_FW_H7_V1.9.0/Drivers/BSP/STM32H7xx_Nucleo/stm32h7xx_nucleo.h \
- ../Core/Inc/stm32h7xx_nucleo_conf.h \
+ ../Core/Inc/stm32h7xx_nucleo.h ../Core/Inc/stm32h7xx_nucleo_conf.h \
  ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal.h \
  ../Core/Inc/stm32h7xx_hal_conf.h \
  ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_rcc.h \
@@ -38,9 +37,9 @@ Core/Src/stm32h7xx_nucleo.o: ../Core/Src/stm32h7xx_nucleo.c \
  ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_pcd.h \
  ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_ll_usb.h \
  ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_pcd_ex.h \
- C:/Users/natha/STM32Cube/Repository/STM32Cube_FW_H7_V1.9.0/Drivers/BSP/STM32H7xx_Nucleo/stm32h7xx_nucleo_errno.h
+ ../Core/Inc/stm32h7xx_nucleo_errno.h
 
-C:/Users/natha/STM32Cube/Repository/STM32Cube_FW_H7_V1.9.0/Drivers/BSP/STM32H7xx_Nucleo/stm32h7xx_nucleo.h:
+../Core/Inc/stm32h7xx_nucleo.h:
 
 ../Core/Inc/stm32h7xx_nucleo_conf.h:
 
@@ -118,4 +117,4 @@ C:/Users/natha/STM32Cube/Repository/STM32Cube_FW_H7_V1.9.0/Drivers/BSP/STM32H7xx
 
 ../Drivers/STM32H7xx_HAL_Driver/Inc/stm32h7xx_hal_pcd_ex.h:
 
-C:/Users/natha/STM32Cube/Repository/STM32Cube_FW_H7_V1.9.0/Drivers/BSP/STM32H7xx_Nucleo/stm32h7xx_nucleo_errno.h:
+../Core/Inc/stm32h7xx_nucleo_errno.h:
