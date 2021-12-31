@@ -1,0 +1,7 @@
+The most interesting project is UART_test2.
+In this project, a AD7276 ADC is used to measure an analog signal.
+The data is read from the ADC via SPI.
+The data is then sent to a computer via UART using the STLINK V3 interface, and later a FT232 interface will be added in parallel.
+The PCB used in this example can be found at https://oshwlab.com/tulanthoar1/ad4000sch
+Note that the PCB was originally made for the AD4000 converter, and I suggest you modify this project to use that if you are able to solder 0.5 mm pin pitch ICs.
+
