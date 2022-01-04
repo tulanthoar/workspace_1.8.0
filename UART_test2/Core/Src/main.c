@@ -130,13 +130,18 @@ int main(void) {
 
 	/* Configure communication direction : 1Line */
 	SPI_1LINE_RX(&hspi1);
+	SPI_1LINE_RX(&hspi2);
 
 //	configure the half transfer callback function to update the wTransferState value
 	hspi1.hdmarx->XferHalfCpltCallback = tx_h_complete;
+	hspi2.hdmarx->XferHalfCpltCallback = tx_h_complete;
 
 //	enable the transfer complete and half transfer interupts for SPI1
 	SET_BIT(SPI1_DMA_INSTANCE->CR, DMA_IT_TC | DMA_IT_HT);
-//	start the DMA transfer on SPI1, use HAL library to perform initial configurations
+	SET_BIT(SPI2_DMA_INSTANCE->CR, DMA_IT_TC | DMA_IT_HT);
+
+#ifdef USE_BREADBOARD
+	start the DMA transfer on SPI1, use HAL library to perform initial configurations
 	if (HAL_DMA_Start(hspi1.hdmarx, (uint32_t) &hspi1.Instance->RXDR,
 					(uint32_t) aRxBuffer, rxCount) != HAL_OK) {
 //		if the DMA initalization was not OK, set the error bit
@@ -146,21 +151,41 @@ int main(void) {
 //		call our custom error handler
 		Error_Handler();
 	}
+#else
+	//	start the DMA transfer on SPI2, use HAL library to perform initial configurations
+		if (HAL_DMA_Start(hspi2.hdmarx, (uint32_t) &hspi2.Instance->RXDR,
+						(uint32_t) aRxBuffer, rxCount) != HAL_OK) {
+	//		if the DMA initalization was not OK, set the error bit
+			SET_BIT(hspi2.ErrorCode, HAL_SPI_ERROR_DMA);
+	//		reset SPI ready state
+			hspi2.State = HAL_SPI_STATE_READY;
+	//		call our custom error handler
+			Error_Handler();
+		}
+#endif
 
 //	set the transfer size to 0 (unlimited)
 	MODIFY_REG(hspi1.Instance->CR2, SPI_CR2_TSIZE, 0UL);
+	MODIFY_REG(hspi2.Instance->CR2, SPI_CR2_TSIZE, 0UL);
 
 //	enable DMA requests on the SPI instance
 	SET_BIT(hspi1.Instance->CFG1, SPI_CFG1_RXDMAEN);
+	SET_BIT(hspi2.Instance->CFG1, SPI_CFG1_RXDMAEN);
 
 	/* Enable the SPI Error Interrupt Bit */
 	__HAL_SPI_ENABLE_IT(&hspi1, (SPI_IT_OVR | SPI_IT_FRE | SPI_IT_MODF));
+	__HAL_SPI_ENABLE_IT(&hspi2, (SPI_IT_OVR | SPI_IT_FRE | SPI_IT_MODF));
 
 	/* Enable SPI peripheral */
 	__HAL_SPI_ENABLE(&hspi1);
+	__HAL_SPI_ENABLE(&hspi2);
 
 //	start the SPI transfers
+#ifdef USE_BREADBOARD
 	SET_BIT(hspi1.Instance->CR1, SPI_CR1_CSTART);
+#else
+	SET_BIT(hspi2.Instance->CR1, SPI_CR1_CSTART);
+#endif
 
 //	wait for the first half of the transfer to complete
 	while (wTransferState != TRANSFER_H_COMPLETE) {
@@ -200,6 +225,7 @@ int main(void) {
 	HAL_NVIC_DisableIRQ(USART3_DMA_IRQN);
 //	suspend DMA interrupts for the SPI channel
 	HAL_NVIC_DisableIRQ(SPI1_DMA_IRQN);
+	HAL_NVIC_DisableIRQ(SPI2_DMA_IRQN);
 //	reset LEDs
 	BSP_LED_Off(LED1);
 	BSP_LED_Off(LED2);
@@ -209,9 +235,13 @@ int main(void) {
 	/* USER CODE BEGIN WHILE */
 	while (1) {
 //		wait for the second half of the receive buffer to finish transferring
+#ifdef USE_BREADBOARD
 		while ((DMA2->LISR & DMA_FLAG_TCIF0_4) != DMA_FLAG_TCIF0_4) { }
+#else
+		while ((DMA2->LISR & DMA_FLAG_TCIF1_5) != DMA_FLAG_TCIF1_5) { }
+#endif
 //		clear the transfer complete flag of the SPI channel
-		DMA2->LIFCR = DMA_FLAG_TCIF0_4;
+		DMA2->LIFCR = DMA_FLAG_TCIF0_4 | DMA_FLAG_TCIF1_5;
 //		the rx buffer index starts at half way through the buffer and goes to the end
 		j = rxOffset;
 		aTxBuffer[0] = aRxBuffer[j];
@@ -236,9 +266,13 @@ int main(void) {
 		SET_BIT(USART3->CR3, USART_CR3_DMAT);
 
 //		wait for the first half of the receive buffer to be ready
+#ifdef USE_BREADBOARD
 		while ((DMA2->LISR & DMA_FLAG_HTIF0_4) != DMA_FLAG_HTIF0_4) {}
+#else
+		while ((DMA2->LISR & DMA_FLAG_HTIF1_5) != DMA_FLAG_HTIF1_5) {}
+#endif
 //		reset the SPI DMA channel half transfer flag
-		DMA2->LIFCR = DMA_FLAG_HTIF0_4;
+		DMA2->LIFCR = DMA_FLAG_HTIF0_4 | DMA_FLAG_HTIF1_5;
 //		the starting index for the recieve buffer is 0
 		j = 0;
 		aTxBuffer[0] = aRxBuffer[0];
@@ -384,7 +418,7 @@ static void MX_SPI1_Init(void) {
 static void MX_SPI2_Init(void) {
 
 	/* SPI1 parameter configuration*/
-	hspi2.Instance = SPI1;
+	hspi2.Instance = SPI2;
 //	set mode to master
 	hspi2.Init.Mode = SPI_MODE_MASTER;
 //	recieve only
