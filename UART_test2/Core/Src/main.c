@@ -63,12 +63,12 @@ __IO uint32_t UserButtonStatus = 0;
 // buffer used to transmit data over UART
 ALIGN_32BYTES (__IO uint16_t aTxBuffer[1024]) = {0};
 // buffer used to receive data over SPI
-ALIGN_32BYTES (__IO uint16_t aRxBuffer[2048]) = {0};
+ALIGN_32BYTES (__IO uint16_t aRxBuffer[4106]) = {0};
 // array to store output values of iir filter, not currently implimented
-float yi[10240] = { 0 };
+float yi[4106] = { 0 };
 
 // The oversampling ratio
-#define OVERSAMPLING 1
+#define OVERSAMPLING 2
 
 /**
  * @brief  The application entry point.
@@ -76,7 +76,7 @@ float yi[10240] = { 0 };
  */
 int main(void) {
 //	length of the recieve buffer array
-	unsigned short rxCount = COUNTOF(aRxBuffer);
+	unsigned short rxCount = COUNTOF(aRxBuffer) - 10;
 //	length of a half transfer of recieve buffer
 	unsigned short rxOffset = rxCount / 2;
 //	length of transmit buffer
@@ -147,7 +147,7 @@ int main(void) {
 #ifdef USE_BREADBOARD
 	start the DMA transfer on SPI1, use HAL library to perform initial configurations
 	if (HAL_DMA_Start(hspi1.hdmarx, (uint32_t) &hspi1.Instance->RXDR,
-					(uint32_t) aRxBuffer, rxCount) != HAL_OK) {
+					(uint32_t) aRxBuffer + 20, rxCount) != HAL_OK) {
 //		if the DMA initalization was not OK, set the error bit
 		SET_BIT(hspi1.ErrorCode, HAL_SPI_ERROR_DMA);
 //		reset SPI ready state
@@ -158,7 +158,7 @@ int main(void) {
 #else
 	//	start the DMA transfer on SPI2, use HAL library to perform initial configurations
 		if (HAL_DMA_Start(hspi2.hdmarx, (uint32_t) &hspi2.Instance->RXDR,
-						(uint32_t) aRxBuffer, rxCount) != HAL_OK) {
+						(uint32_t) aRxBuffer + 20, rxCount) != HAL_OK) {
 	//		if the DMA initalization was not OK, set the error bit
 			SET_BIT(hspi2.ErrorCode, HAL_SPI_ERROR_DMA);
 	//		reset SPI ready state
@@ -205,8 +205,8 @@ int main(void) {
 	BSP_LED_Off(LED3);
 //	transfer data from rxbuffer to tx buffer
 //	j is the index for the rx buffer
-	int j = 0;
-	aTxBuffer[0] = aRxBuffer[0];
+	int j = 10;
+	aTxBuffer[0] = aRxBuffer[j];
 //	i is the index of the tx buffer
 //	j increases by the oversampling ratio for each inciment in i
 	for (int i = 1; i < txCount; ++i) {
@@ -247,16 +247,28 @@ int main(void) {
 //		clear the transfer complete flag of the SPI channel
 		DMA2->LIFCR = DMA_FLAG_TCIF0_4 | DMA_FLAG_TCIF1_5;
 //		the rx buffer index starts at half way through the buffer and goes to the end
-		j = rxOffset;
-		aTxBuffer[0] = aRxBuffer[j];
-		for (int i = 1; i < txCount; ++i) {
-			//		  for( int k = 0; k < OVERSAMPLING; ++k, ++j){
-			//			  yi[j] = aRxBuffer[j] * 1.0;
-			//		  }
+		j = rxOffset + 10;
+		for (int i = 0; i < txCount; ++i) {
+
+			yi[j] = (4.7396331426e-05) * aRxBuffer[j] + (9.4792662851e-05) * aRxBuffer[j-1] \
+			+ (4.7396331426e-05) * aRxBuffer[j-2] \
+			- (-1.9804331333e+00) * yi[j-1] - (9.8062271867e-01) * yi[j-2];
+			++j;
+			yi[j] = (4.7396331426e-05) * aRxBuffer[j] + (9.4792662851e-05) * aRxBuffer[j-1] \
+			+ (4.7396331426e-05) * aRxBuffer[j-2] \
+			- (-1.9804331333e+00) * yi[j-1] - (9.8062271867e-01) * yi[j-2];
+
+
 //			j increases by the oversampling ratio for every increment in i
-			j += OVERSAMPLING;
-			aTxBuffer[i] = aRxBuffer[j];
+//			j += OVERSAMPLING;
+			aTxBuffer[i] = (uint16_t)yi[j];
+			++j;
 		}
+		yi[9] = yi[j-1];
+		aRxBuffer[9] = aRxBuffer[j-1];
+		yi[8] = yi[j-2];
+		aRxBuffer[8] = aRxBuffer[j-2];
+
 
 //		wait for the UART to finish transferring
 		while ((USART3->ISR & UART_FLAG_TC) != UART_FLAG_TC) { }
@@ -278,15 +290,18 @@ int main(void) {
 //		reset the SPI DMA channel half transfer flag
 		DMA2->LIFCR = DMA_FLAG_HTIF0_4 | DMA_FLAG_HTIF1_5;
 //		the starting index for the recieve buffer is 0
-		j = 0;
-		aTxBuffer[0] = aRxBuffer[0];
-		for (int i = 1; i < txCount; ++i) {
-			//		  for( int k = 0; k < OVERSAMPLING; ++k, ++j){
-			//			  yi[j] = aRxBuffer[j] * 1.0;
-			//		  }
-//            j increases by the oversampling ratio for each increment of i
-			j += OVERSAMPLING;
-			aTxBuffer[i] = aRxBuffer[j];
+		j = 10;
+		for (int i = 0; i < txCount; ++i) {
+			yi[j] = (4.7396331426e-05) * aRxBuffer[j] + (9.4792662851e-05) * aRxBuffer[j-1] \
+			+ (4.7396331426e-05) * aRxBuffer[j-2] \
+			- (-1.9804331333e+00) * yi[j-1] - (9.8062271867e-01) * yi[j-2];
+			++j;
+			yi[j] = (4.7396331426e-05) * aRxBuffer[j] + (9.4792662851e-05) * aRxBuffer[j-1] \
+			+ (4.7396331426e-05) * aRxBuffer[j-2] \
+			- (-1.9804331333e+00) * yi[j-1] - (9.8062271867e-01) * yi[j-2];
+
+			  aTxBuffer[i] = (uint16_t)yi[j];
+				++j;
 		}
 
 //		wait for the UART to finish transferring
