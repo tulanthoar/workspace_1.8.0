@@ -63,12 +63,12 @@ __IO uint32_t UserButtonStatus = 0;
 // buffer used to transmit data over UART
 ALIGN_32BYTES (__IO uint16_t aTxBuffer[1024]) = {0};
 // buffer used to receive data over SPI
-ALIGN_32BYTES (__IO uint16_t aRxBuffer[4106]) = {0};
+ALIGN_32BYTES (__IO uint16_t aRxBuffer[6154]) = {0};
 // array to store output values of iir filter, not currently implimented
-float yi[4106] = { 0 };
+float yi[6154] = { 0 };
 
 // The oversampling ratio
-#define OVERSAMPLING 2
+#define OVERSAMPLING 3
 
 /**
  * @brief  The application entry point.
@@ -89,7 +89,7 @@ int main(void) {
 	/* Enable I-Cache---------------------------------------------------------*/
 	SCB_EnableICache();
 //	Enabling the data cache gives incorrect results
-	//  SCB_EnableDCache();
+//	  SCB_EnableDCache();
 
 	/* MCU Configuration--------------------------------------------------------*/
 
@@ -250,17 +250,18 @@ int main(void) {
 		j = rxOffset + 10;
 		for (int i = 0; i < txCount; ++i) {
 
-			yi[j] = (4.7396331426e-05) * aRxBuffer[j] + (9.4792662851e-05) * aRxBuffer[j-1] \
-			+ (4.7396331426e-05) * aRxBuffer[j-2] \
-			- (-1.9804331333e+00) * yi[j-1] - (9.8062271867e-01) * yi[j-2];
+			yi[j] = (1.9368153599e-03) * aRxBuffer[j] + (3.8736307197e-03) * aRxBuffer[j-1] \
+			+ (1.9368153599e-03) * aRxBuffer[j-2] \
+			- (-1.8717096587e+00) * yi[j-1] - (8.7945692017e-01) * yi[j-2];
 			++j;
-			yi[j] = (4.7396331426e-05) * aRxBuffer[j] + (9.4792662851e-05) * aRxBuffer[j-1] \
-			+ (4.7396331426e-05) * aRxBuffer[j-2] \
-			- (-1.9804331333e+00) * yi[j-1] - (9.8062271867e-01) * yi[j-2];
+			yi[j] = (1.9368153599e-03) * aRxBuffer[j] + (3.8736307197e-03) * aRxBuffer[j-1] \
+			+ (1.9368153599e-03) * aRxBuffer[j-2] \
+			- (-1.8717096587e+00) * yi[j-1] - (8.7945692017e-01) * yi[j-2];
+			++j;
+			yi[j] = (1.9368153599e-03) * aRxBuffer[j] + (3.8736307197e-03) * aRxBuffer[j-1] \
+			+ (1.9368153599e-03) * aRxBuffer[j-2] \
+			- (-1.8717096587e+00) * yi[j-1] - (8.7945692017e-01) * yi[j-2];
 
-
-//			j increases by the oversampling ratio for every increment in i
-//			j += OVERSAMPLING;
 			aTxBuffer[i] = (uint16_t)yi[j];
 			++j;
 		}
@@ -292,13 +293,17 @@ int main(void) {
 //		the starting index for the recieve buffer is 0
 		j = 10;
 		for (int i = 0; i < txCount; ++i) {
-			yi[j] = (4.7396331426e-05) * aRxBuffer[j] + (9.4792662851e-05) * aRxBuffer[j-1] \
-			+ (4.7396331426e-05) * aRxBuffer[j-2] \
-			- (-1.9804331333e+00) * yi[j-1] - (9.8062271867e-01) * yi[j-2];
+			yi[j] = (1.9368153599e-03) * aRxBuffer[j] + (3.8736307197e-03) * aRxBuffer[j-1] \
+			+ (1.9368153599e-03) * aRxBuffer[j-2] \
+			- (-1.8717096587e+00) * yi[j-1] - (8.7945692017e-01) * yi[j-2];
 			++j;
-			yi[j] = (4.7396331426e-05) * aRxBuffer[j] + (9.4792662851e-05) * aRxBuffer[j-1] \
-			+ (4.7396331426e-05) * aRxBuffer[j-2] \
-			- (-1.9804331333e+00) * yi[j-1] - (9.8062271867e-01) * yi[j-2];
+			yi[j] = (1.9368153599e-03) * aRxBuffer[j] + (3.8736307197e-03) * aRxBuffer[j-1] \
+			+ (1.9368153599e-03) * aRxBuffer[j-2] \
+			- (-1.8717096587e+00) * yi[j-1] - (8.7945692017e-01) * yi[j-2];
+			++j;
+			yi[j] = (1.9368153599e-03) * aRxBuffer[j] + (3.8736307197e-03) * aRxBuffer[j-1] \
+			+ (1.9368153599e-03) * aRxBuffer[j-2] \
+			- (-1.8717096587e+00) * yi[j-1] - (8.7945692017e-01) * yi[j-2];
 
 			  aTxBuffer[i] = (uint16_t)yi[j];
 				++j;
