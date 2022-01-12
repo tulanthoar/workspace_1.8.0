@@ -77,8 +77,6 @@ float yi[8202] = { 0 };
 int main(void) {
 //	length of the recieve buffer array
 	unsigned short rxCount = COUNTOF(aRxBuffer) - 10;
-//	length of a half transfer of recieve buffer
-	unsigned short rxOffset = rxCount / 2;
 //	length of transmit buffer
 	unsigned short txCount = COUNTOF(aTxBuffer);
 //	set the transmit buffer to a known value
@@ -247,24 +245,27 @@ int main(void) {
 //		clear the transfer complete flag of the SPI channel
 		DMA2->LIFCR = DMA_FLAG_TCIF0_4 | DMA_FLAG_TCIF1_5;
 //		the rx buffer index starts at half way through the buffer and goes to the end
-		j = rxOffset + 10;
 		for (int i = 0; i < txCount; ++i) {
 
-			yi[j] = (1.1315261690e-03) * aRxBuffer[j] + (2.2630523380e-03) * aRxBuffer[j-1] \
-			+ (1.1315261690e-03) * aRxBuffer[j-2] \
-			- (-1.9026207664e+00) * yi[j-1] - (9.0714687103e-01) * yi[j-2];
+			yi[j] = (3.8221415127e-05) * aRxBuffer[j] + (1.1466424538e-04) * aRxBuffer[j-1] \
+			+ (1.1466424538e-04) * aRxBuffer[j-2] + (3.8221415127e-05) * aRxBuffer[j-3] \
+			- (-2.8622106749e+00) * yi[j-1] - (2.7337512338e+00) * yi[j-2] \
+			- (-8.7123478761e-01) * yi[j-3];
 			++j;
-			yi[j] = (1.1315261690e-03) * aRxBuffer[j] + (2.2630523380e-03) * aRxBuffer[j-1] \
-			+ (1.1315261690e-03) * aRxBuffer[j-2] \
-			- (-1.9026207664e+00) * yi[j-1] - (9.0714687103e-01) * yi[j-2];
+			yi[j] = (3.8221415127e-05) * aRxBuffer[j] + (1.1466424538e-04) * aRxBuffer[j-1] \
+			+ (1.1466424538e-04) * aRxBuffer[j-2] + (3.8221415127e-05) * aRxBuffer[j-3] \
+			- (-2.8622106749e+00) * yi[j-1] - (2.7337512338e+00) * yi[j-2] \
+			- (-8.7123478761e-01) * yi[j-3];
 			++j;
-			yi[j] = (1.1315261690e-03) * aRxBuffer[j] + (2.2630523380e-03) * aRxBuffer[j-1] \
-			+ (1.1315261690e-03) * aRxBuffer[j-2] \
-			- (-1.9026207664e+00) * yi[j-1] - (9.0714687103e-01) * yi[j-2];
+			yi[j] = (3.8221415127e-05) * aRxBuffer[j] + (1.1466424538e-04) * aRxBuffer[j-1] \
+			+ (1.1466424538e-04) * aRxBuffer[j-2] + (3.8221415127e-05) * aRxBuffer[j-3] \
+			- (-2.8622106749e+00) * yi[j-1] - (2.7337512338e+00) * yi[j-2] \
+			- (-8.7123478761e-01) * yi[j-3];
 			++j;
-			yi[j] = (1.1315261690e-03) * aRxBuffer[j] + (2.2630523380e-03) * aRxBuffer[j-1] \
-			+ (1.1315261690e-03) * aRxBuffer[j-2] \
-			- (-1.9026207664e+00) * yi[j-1] - (9.0714687103e-01) * yi[j-2];
+			yi[j] = (3.8221415127e-05) * aRxBuffer[j] + (1.1466424538e-04) * aRxBuffer[j-1] \
+			+ (1.1466424538e-04) * aRxBuffer[j-2] + (3.8221415127e-05) * aRxBuffer[j-3] \
+			- (-2.8622106749e+00) * yi[j-1] - (2.7337512338e+00) * yi[j-2] \
+			- (-8.7123478761e-01) * yi[j-3];
 
 			aTxBuffer[i] = (uint16_t)yi[j];
 			++j;
@@ -273,6 +274,8 @@ int main(void) {
 		aRxBuffer[9] = aRxBuffer[j-1];
 		yi[8] = yi[j-2];
 		aRxBuffer[8] = aRxBuffer[j-2];
+		yi[7] = yi[j-3];
+		aRxBuffer[7] = aRxBuffer[j-3];
 
 
 //		wait for the UART to finish transferring
@@ -297,21 +300,25 @@ int main(void) {
 //		the starting index for the recieve buffer is 0
 		j = 10;
 		for (int i = 0; i < txCount; ++i) {
-			yi[j] = (1.1315261690e-03) * aRxBuffer[j] + (2.2630523380e-03) * aRxBuffer[j-1] \
-			+ (1.1315261690e-03) * aRxBuffer[j-2] \
-			- (-1.9026207664e+00) * yi[j-1] - (9.0714687103e-01) * yi[j-2];
+			yi[j] = (3.8221415127e-05) * aRxBuffer[j] + (1.1466424538e-04) * aRxBuffer[j-1] \
+			+ (1.1466424538e-04) * aRxBuffer[j-2] + (3.8221415127e-05) * aRxBuffer[j-3] \
+			- (-2.8622106749e+00) * yi[j-1] - (2.7337512338e+00) * yi[j-2] \
+			- (-8.7123478761e-01) * yi[j-3];
 			++j;
-			yi[j] = (1.1315261690e-03) * aRxBuffer[j] + (2.2630523380e-03) * aRxBuffer[j-1] \
-			+ (1.1315261690e-03) * aRxBuffer[j-2] \
-			- (-1.9026207664e+00) * yi[j-1] - (9.0714687103e-01) * yi[j-2];
+			yi[j] = (3.8221415127e-05) * aRxBuffer[j] + (1.1466424538e-04) * aRxBuffer[j-1] \
+			+ (1.1466424538e-04) * aRxBuffer[j-2] + (3.8221415127e-05) * aRxBuffer[j-3] \
+			- (-2.8622106749e+00) * yi[j-1] - (2.7337512338e+00) * yi[j-2] \
+			- (-8.7123478761e-01) * yi[j-3];
 			++j;
-			yi[j] = (1.1315261690e-03) * aRxBuffer[j] + (2.2630523380e-03) * aRxBuffer[j-1] \
-			+ (1.1315261690e-03) * aRxBuffer[j-2] \
-			- (-1.9026207664e+00) * yi[j-1] - (9.0714687103e-01) * yi[j-2];
+			yi[j] = (3.8221415127e-05) * aRxBuffer[j] + (1.1466424538e-04) * aRxBuffer[j-1] \
+			+ (1.1466424538e-04) * aRxBuffer[j-2] + (3.8221415127e-05) * aRxBuffer[j-3] \
+			- (-2.8622106749e+00) * yi[j-1] - (2.7337512338e+00) * yi[j-2] \
+			- (-8.7123478761e-01) * yi[j-3];
 			++j;
-			yi[j] = (1.1315261690e-03) * aRxBuffer[j] + (2.2630523380e-03) * aRxBuffer[j-1] \
-			+ (1.1315261690e-03) * aRxBuffer[j-2] \
-			- (-1.9026207664e+00) * yi[j-1] - (9.0714687103e-01) * yi[j-2];
+			yi[j] = (3.8221415127e-05) * aRxBuffer[j] + (1.1466424538e-04) * aRxBuffer[j-1] \
+			+ (1.1466424538e-04) * aRxBuffer[j-2] + (3.8221415127e-05) * aRxBuffer[j-3] \
+			- (-2.8622106749e+00) * yi[j-1] - (2.7337512338e+00) * yi[j-2] \
+			- (-8.7123478761e-01) * yi[j-3];
 
 			  aTxBuffer[i] = (uint16_t)yi[j];
 				++j;
