@@ -1001,20 +1001,20 @@ Disassembly of section .text:
  8000cce:	ed9f 3b0e 	vldr	d3, [pc, #56]	; 8000d08 <main+0x620>
  8000cd2:	f8df 9078 	ldr.w	r9, [pc, #120]	; 8000d4c <main+0x664>
  8000cd6:	e052      	b.n	8000d7e <main+0x696>
- 8000cd8:	4355fc51 	.word	0x4355fc51
- 8000cdc:	3eb5a3e7 	.word	0x3eb5a3e7
- 8000ce0:	4357c97c 	.word	0x4357c97c
- 8000ce4:	3ed5a3e7 	.word	0x3ed5a3e7
- 8000ce8:	72824a68 	.word	0x72824a68
- 8000cec:	3ee03aed 	.word	0x3ee03aed
- 8000cf0:	a706a410 	.word	0xa706a410
- 8000cf4:	400e8f42 	.word	0x400e8f42
- 8000cf8:	a459ba51 	.word	0xa459ba51
- 8000cfc:	4015e74e 	.word	0x4015e74e
- 8000d00:	d060046c 	.word	0xd060046c
- 8000d04:	400bedc2 	.word	0x400bedc2
- 8000d08:	02961318 	.word	0x02961318
- 8000d0c:	3feab9cc 	.word	0x3feab9cc
+ 8000cd8:	df96cd24 	.word	0xdf96cd24
+ 8000cdc:	3ef3c743 	.word	0x3ef3c743
+ 8000ce0:	df95ace9 	.word	0xdf95ace9
+ 8000ce4:	3f13c743 	.word	0x3f13c743
+ 8000ce8:	cf5db2ca 	.word	0xcf5db2ca
+ 8000cec:	3f1daae5 	.word	0x3f1daae5
+ 8000cf0:	84e917e3 	.word	0x84e917e3
+ 8000cf4:	400d1f9a 	.word	0x400d1f9a
+ 8000cf8:	b1e12b57 	.word	0xb1e12b57
+ 8000cfc:	4013f029 	.word	0x4013f029
+ 8000d00:	d382263e 	.word	0xd382263e
+ 8000d04:	400854e3 	.word	0x400854e3
+ 8000d08:	bb2aa0d9 	.word	0xbb2aa0d9
+ 8000d0c:	3fe65324 	.word	0x3fe65324
  8000d10:	2400cb9c 	.word	0x2400cb9c
  8000d14:	40013000 	.word	0x40013000
  8000d18:	2400c88c 	.word	0x2400c88c
