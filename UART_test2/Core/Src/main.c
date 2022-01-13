@@ -218,13 +218,22 @@ int main(void) {
 //		if it fails, call our error handler
 		Error_Handler();
 	}
+	//	Use the HAL driver to transmit the buffer over DMA
+	//	HAL will initialize many of the settings for us
+		if (HAL_UART_Transmit_DMA(&huart1, (uint8_t*) aTxBuffer, sizeof(aTxBuffer))
+				!= HAL_OK) {
+	//		if it fails, call our error handler
+			Error_Handler();
+		}
 //	Suspend interupts that we no longer need, for the purpose of efficiency
 //	suspend the systick
 	HAL_SuspendTick();
 //	suspend UART3 interupts
 	HAL_NVIC_DisableIRQ(USART3_IRQn);
+	HAL_NVIC_DisableIRQ(USART1_IRQn);
 //	suspend DMA interupts for the UART3 channel
 	HAL_NVIC_DisableIRQ(USART3_DMA_IRQN);
+	HAL_NVIC_DisableIRQ(USART1_DMA_IRQN);
 //	suspend DMA interrupts for the SPI channel
 	HAL_NVIC_DisableIRQ(SPI1_DMA_IRQN);
 	HAL_NVIC_DisableIRQ(SPI2_DMA_IRQN);
@@ -284,16 +293,20 @@ int main(void) {
 		aRxBuffer[6] = aRxBuffer[j-4];
 
 
-//		wait for the UART to finish transferring
+//		wait for the UARTs to finish transferring
 		while ((USART3->ISR & UART_FLAG_TC) != UART_FLAG_TC) { }
-//		reset the UART transfer complete flag
+		while ((USART1->ISR & UART_FLAG_TC) != UART_FLAG_TC) { }
+//		reset the UARTs transfer complete flag
 		USART3->ICR = UART_CLEAR_TCF;
-//		reset the UART's DMA channel transfer complete and half transfer flags
-		DMA1->LIFCR = DMA_FLAG_TCIF1_5 | DMA_FLAG_HTIF1_5;
-//		reenable the UART DMA channel
+		USART1->ICR = UART_CLEAR_TCF;
+//		reset the UART's DMA channels transfer complete and half transfer flags
+		DMA1->LIFCR = DMA_FLAG_TCIF1_5 | DMA_FLAG_HTIF1_5 | DMA_FLAG_TCIF0_4 | DMA_FLAG_HTIF0_4;
+//		reenable the UART DMA channels
 		SET_BIT(USART3_DMA_INSTANCE->CR, (DMA_SxCR_EN));
-//		start the UART DMA transfer
+		SET_BIT(USART1_DMA_INSTANCE->CR, (DMA_SxCR_EN));
+//		start the UARTs DMA transfer
 		SET_BIT(USART3->CR3, USART_CR3_DMAT);
+		SET_BIT(USART1->CR3, USART_CR3_DMAT);
 
 //		wait for the first half of the receive buffer to be ready
 #ifdef USE_BREADBOARD
@@ -334,16 +347,20 @@ int main(void) {
 				++j;
 		}
 
-//		wait for the UART to finish transferring
+//		wait for the UARTs to finish transferring
 		while ((USART3->ISR & UART_FLAG_TC) != UART_FLAG_TC) {}
-//		clear the transfer complete flag of the UART
+		while ((USART1->ISR & UART_FLAG_TC) != UART_FLAG_TC) {}
+//		clear the transfer complete flag of the UARTs
 		USART3->ICR = UART_CLEAR_TCF;
-//		clear the transfer complete and half transfer flags of the UART DMA channel
-		DMA1->LIFCR = DMA_FLAG_TCIF1_5 | DMA_FLAG_HTIF1_5;
-//		enable the UART DMA channel
+		USART1->ICR = UART_CLEAR_TCF;
+//		clear the transfer complete and half transfer flags of the UART DMA channels
+		DMA1->LIFCR = DMA_FLAG_TCIF1_5 | DMA_FLAG_HTIF1_5 | DMA_FLAG_TCIF0_4 | DMA_FLAG_HTIF0_4;
+//		enable the UART DMA channels
 		SET_BIT(USART3_DMA_INSTANCE->CR, (DMA_SxCR_EN));
-//		start the UART DMA transfer
+		SET_BIT(USART1_DMA_INSTANCE->CR, (DMA_SxCR_EN));
+//		start the UART DMA transfers
 		SET_BIT(USART3->CR3, USART_CR3_DMAT);
+		SET_BIT(USART1->CR3, USART_CR3_DMAT);
 	}
 }
 
