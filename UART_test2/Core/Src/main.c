@@ -60,8 +60,10 @@ __IO uint32_t wTransferState = TRANSFER_WAIT;
 
 // the value of this variable is toggled when the user button is pressed
 __IO uint32_t UserButtonStatus = 0;
-// buffer used to transmit data over UART
+// buffer used to transmit data over board UART
 ALIGN_32BYTES (__IO uint16_t aTxBuffer[1024]) = {0};
+// buffer used to transmit data over stlink mini UART
+ALIGN_32BYTES (__IO uint16_t aTxBufferMini[1024]) = {0};
 // buffer used to receive data over SPI
 ALIGN_32BYTES (__IO uint16_t aRxBuffer[8202]) = {0};
 // array to store output values of iir filter, not currently implimented
@@ -70,24 +72,32 @@ float yi[8202] = { 0 };
 // The oversampling ratio
 #define OVERSAMPLING 4
 
+#define CALC_YI yi[j] = (8.9938621343e-04) * aRxBuffer[j] + (2.6981586403e-03) * aRxBuffer[j-1] \
+		+ (2.6981586403e-03) * aRxBuffer[j-2] + (8.9938621343e-04) * aRxBuffer[j-3] \
+		- (-2.5885576576e+00) * yi[j-1] - (2.2574907505e+00) * yi[j-2] \
+		- (-6.6173800320e-01) * yi[j-3];
+
+#define USE_BREADBOARD
+
 /**
  * @brief  The application entry point.
  * @retval int
  */
 int main(void) {
-//	length of the recieve buffer array
+	//	length of the recieve buffer array
 	unsigned short rxCount = COUNTOF(aRxBuffer) - 10;
-//	length of transmit buffer
+	//	length of transmit buffer
 	unsigned short txCount = COUNTOF(aTxBuffer);
-//	set the transmit buffer to a known value
+	//	set the transmit buffer to a known value
 	for (int i = 0; i < txCount; ++i) {
 		aTxBuffer[i] = i % 16384;
+		aTxBufferMini[i] = aTxBuffer[i];
 	}
 
 	/* Enable I-Cache---------------------------------------------------------*/
 	SCB_EnableICache();
-//	Enabling the data cache gives incorrect results
-//	  SCB_EnableDCache();
+	//	Enabling the data cache gives incorrect results
+	//	  SCB_EnableDCache();
 
 	/* MCU Configuration--------------------------------------------------------*/
 
@@ -97,35 +107,36 @@ int main(void) {
 	/* Configure the system clock */
 	SystemClock_Config();
 
-//    initialize GPIO
+	//    initialize GPIO
 	MX_GPIO_Init();
 
-//	turn off all the PCB LEDs
+	//	turn off all the PCB LEDs
 	GPIOE->BSRR = GPIO_PIN_0 | GPIO_PIN_13 | GPIO_PIN_15;
 	GPIOF->BSRR = GPIO_PIN_11 | GPIO_PIN_12 | GPIO_PIN_13 | GPIO_PIN_15;
 	GPIOG->BSRR = GPIO_PIN_4 | GPIO_PIN_5 | GPIO_PIN_6 | GPIO_PIN_6 | GPIO_PIN_8 | GPIO_PIN_14;
-//	initialize the compensation cell to improve slew rate
+	//	initialize the compensation cell to improve slew rate
 	HAL_EnableCompensationCell();
-//	initialize the DMA, must be done before other peripherals
+	//	initialize the DMA, must be done before other peripherals
 	MX_DMA_Init();
-//	initialize UART1, going to the ft232 interface
+
+	//	initialize UART1, going to the stlink mini interface
 	MX_USART1_UART_Init();
-//	initialize URT3, going to the STLINK interface
+	//	initialize URT3, going to the STLINK interface
 	MX_USART3_UART_Init();
 
-//	initialize SPI1 interface, going to the breadboard converter
+	//	initialize SPI1 interface, going to the breadboard converter
 	MX_SPI1_Init();
-//	initialize the SPI2 interface, going to the pcb converter
-    MX_SPI2_Init();
+	//	initialize the SPI2 interface, going to the pcb converter
+	MX_SPI2_Init();
 
-//  stall until the user button is pressed
+	//  stall until the user button is pressed
 	while (UserButtonStatus == 0) {
 		BSP_LED_Toggle(LED1);
 		HAL_Delay(100);
 	}
-//	reset the user button status
+	//	reset the user button status
 	UserButtonStatus = 0;
-//	reset LEDS
+	//	reset LEDS
 	BSP_LED_Off(LED1);
 	BSP_LED_Off(LED2);
 	BSP_LED_Off(LED3);
@@ -134,47 +145,37 @@ int main(void) {
 	SPI_1LINE_RX(&hspi1);
 	SPI_1LINE_RX(&hspi2);
 
-//	configure the half transfer callback function to update the wTransferState value
+	//	configure the half transfer callback function to update the wTransferState value
 	hspi1.hdmarx->XferHalfCpltCallback = tx_h_complete;
 	hspi2.hdmarx->XferHalfCpltCallback = tx_h_complete;
 
-//	enable the transfer complete and half transfer interupts for SPI1
+	//	enable the transfer complete and half transfer interupts for SPI1
 	SET_BIT(SPI1_DMA_INSTANCE->CR, DMA_IT_TC | DMA_IT_HT);
 	SET_BIT(SPI2_DMA_INSTANCE->CR, DMA_IT_TC | DMA_IT_HT);
 
 #ifdef USE_BREADBOARD
 	start the DMA transfer on SPI1, use HAL library to perform initial configurations
 	if (HAL_DMA_Start(hspi1.hdmarx, (uint32_t) &hspi1.Instance->RXDR,
-					(uint32_t) aRxBuffer + 20, rxCount) != HAL_OK) {
-//		if the DMA initalization was not OK, set the error bit
-		SET_BIT(hspi1.ErrorCode, HAL_SPI_ERROR_DMA);
-//		reset SPI ready state
-		hspi1.State = HAL_SPI_STATE_READY;
-//		call our custom error handler
+			(uint32_t) aRxBuffer + 20, rxCount) != HAL_OK) {
 		Error_Handler();
 	}
 #else
 	//	start the DMA transfer on SPI2, use HAL library to perform initial configurations
-		if (HAL_DMA_Start(hspi2.hdmarx, (uint32_t) &hspi2.Instance->RXDR,
-						(uint32_t) aRxBuffer + 20, rxCount) != HAL_OK) {
-	//		if the DMA initalization was not OK, set the error bit
-			SET_BIT(hspi2.ErrorCode, HAL_SPI_ERROR_DMA);
-	//		reset SPI ready state
-			hspi2.State = HAL_SPI_STATE_READY;
-	//		call our custom error handler
-			Error_Handler();
-		}
+	if (HAL_DMA_Start(hspi2.hdmarx, (uint32_t) &hspi2.Instance->RXDR,
+			(uint32_t) aRxBuffer + 20, rxCount) != HAL_OK) {
+		Error_Handler();
+	}
 #endif
 
-//	set the transfer size to 0 (unlimited)
+	//	set the transfer size to 0 (unlimited)
 	MODIFY_REG(hspi1.Instance->CR2, SPI_CR2_TSIZE, 0UL);
 	MODIFY_REG(hspi2.Instance->CR2, SPI_CR2_TSIZE, 0UL);
 
-//	enable DMA requests on the SPI instance
+	//	enable DMA requests on the SPI instance
 	SET_BIT(hspi1.Instance->CFG1, SPI_CFG1_RXDMAEN);
 	SET_BIT(hspi2.Instance->CFG1, SPI_CFG1_RXDMAEN);
 
-	/* Enable the SPI Error Interrupt Bit */
+	/* Enable the SPI Error Interrupt Bits */
 	__HAL_SPI_ENABLE_IT(&hspi1, (SPI_IT_OVR | SPI_IT_FRE | SPI_IT_MODF));
 	__HAL_SPI_ENABLE_IT(&hspi2, (SPI_IT_OVR | SPI_IT_FRE | SPI_IT_MODF));
 
@@ -182,62 +183,64 @@ int main(void) {
 	__HAL_SPI_ENABLE(&hspi1);
 	__HAL_SPI_ENABLE(&hspi2);
 
-//	start the SPI transfers
+	//	start the SPI transfers
 #ifdef USE_BREADBOARD
 	SET_BIT(hspi1.Instance->CR1, SPI_CR1_CSTART);
 #else
 	SET_BIT(hspi2.Instance->CR1, SPI_CR1_CSTART);
 #endif
 
-//	wait for the first half of the transfer to complete
+	//	wait for the first half of the transfer to complete
 	while (wTransferState != TRANSFER_H_COMPLETE) {
-//		toggle LED2 every 20 ms
+		//		toggle LED2 every 20 ms
 		HAL_Delay(20);
 		BSP_LED_Toggle(LED3);
 	}
-//	reset transfer state
+	//	reset transfer state
 	wTransferState = TRANSFER_WAIT;
-//	reset LEDs
+	//	reset LEDs
 	BSP_LED_Off(LED1);
 	BSP_LED_Off(LED2);
 	BSP_LED_Off(LED3);
-//	transfer data from rxbuffer to tx buffer
-//	j is the index for the rx buffer
+	//	transfer data from rxbuffer to tx buffer
+	//	j is the index for the rx buffer
 	int j = 10;
-	aTxBuffer[0] = aRxBuffer[j];
-//	i is the index of the tx buffer
-//	j increases by the oversampling ratio for each inciment in i
+	aTxBuffer[0] = aRxBuffer[j] << 4;
+	aTxBufferMini[0] = aTxBuffer[0];
+	//	i is the index of the tx buffer
+	//	j increases by the oversampling ratio for each inciment in i
 	for (int i = 1; i < txCount; ++i) {
 		j += OVERSAMPLING;
-		aTxBuffer[i] = aRxBuffer[j];
+		aTxBuffer[i] = aRxBuffer[j] << 4;
+		aTxBufferMini[i] = aTxBuffer[i];
 	}
-//	Use the HAL driver to transmit the buffer over DMA
-//	HAL will initialize many of the settings for us
+	//	Use the HAL driver to transmit the buffer over DMA
+	//	HAL will initialize many of the settings for us
 	if (HAL_UART_Transmit_DMA(&huart3, (uint8_t*) aTxBuffer, sizeof(aTxBuffer))
 			!= HAL_OK) {
-//		if it fails, call our error handler
+		//		if it fails, call our error handler
 		Error_Handler();
 	}
 	//	Use the HAL driver to transmit the buffer over DMA
 	//	HAL will initialize many of the settings for us
-		if (HAL_UART_Transmit_DMA(&huart1, (uint8_t*) aTxBuffer, sizeof(aTxBuffer))
-				!= HAL_OK) {
-	//		if it fails, call our error handler
-			Error_Handler();
-		}
-//	Suspend interupts that we no longer need, for the purpose of efficiency
-//	suspend the systick
+	if (HAL_UART_Transmit_DMA(&huart1, (uint8_t*) aTxBufferMini, sizeof(aTxBufferMini))
+			!= HAL_OK) {
+		//		if it fails, call our error handler
+		Error_Handler();
+	}
+	//	Suspend interupts that we no longer need, for the purpose of efficiency
+	//	suspend the systick
 	HAL_SuspendTick();
-//	suspend UART3 interupts
+	//	suspend UART3 interupts
 	HAL_NVIC_DisableIRQ(USART3_IRQn);
 	HAL_NVIC_DisableIRQ(USART1_IRQn);
-//	suspend DMA interupts for the UART3 channel
+	//	suspend DMA interupts for the UART3 channel
 	HAL_NVIC_DisableIRQ(USART3_DMA_IRQN);
 	HAL_NVIC_DisableIRQ(USART1_DMA_IRQN);
-//	suspend DMA interrupts for the SPI channel
+	//	suspend DMA interrupts for the SPI channel
 	HAL_NVIC_DisableIRQ(SPI1_DMA_IRQN);
 	HAL_NVIC_DisableIRQ(SPI2_DMA_IRQN);
-//	reset LEDs
+	//	reset LEDs
 	BSP_LED_Off(LED1);
 	BSP_LED_Off(LED2);
 	BSP_LED_Off(LED3);
@@ -245,41 +248,28 @@ int main(void) {
 	/* Infinite loop */
 	/* USER CODE BEGIN WHILE */
 	while (1) {
-//		wait for the second half of the receive buffer to finish transferring
+		//		wait for the second half of the receive buffer to finish transferring
 #ifdef USE_BREADBOARD
 		while ((DMA2->LISR & DMA_FLAG_TCIF0_4) != DMA_FLAG_TCIF0_4) { }
 #else
 		while ((DMA2->LISR & DMA_FLAG_TCIF1_5) != DMA_FLAG_TCIF1_5) { }
 #endif
-//		clear the transfer complete flag of the SPI channel
+		//		clear the transfer complete flag of the SPI channel
 		DMA2->LIFCR = DMA_FLAG_TCIF0_4 | DMA_FLAG_TCIF1_5;
-//		the rx buffer index starts at half way through the buffer and goes to the end
+		//		the rx buffer index starts at half way through the buffer and goes to the end
 		for (int i = 0; i < txCount; ++i) {
-
-			yi[j] = (1.8862132469e-05) * aRxBuffer[j] + (7.5448529875e-05) * aRxBuffer[j-1] \
-			+ (1.1317279481e-04) * aRxBuffer[j-2] + (7.5448529875e-05) * aRxBuffer[j-3] \
-			+ (1.8862132469e-05) * aRxBuffer[j-4] \
-			- (-3.6404314407e+00) * yi[j-1] - (4.9845340532e+00) * yi[j-2] \
-			- (-3.0414501690e+00) * yi[j-3] - (6.9764935070e-01) * yi[j-4];
+			aRxBuffer[j] <<= 4;
+			CALC_YI
 			++j;
-			yi[j] = (1.8862132469e-05) * aRxBuffer[j] + (7.5448529875e-05) * aRxBuffer[j-1] \
-			+ (1.1317279481e-04) * aRxBuffer[j-2] + (7.5448529875e-05) * aRxBuffer[j-3] \
-			+ (1.8862132469e-05) * aRxBuffer[j-4] \
-			- (-3.6404314407e+00) * yi[j-1] - (4.9845340532e+00) * yi[j-2] \
-			- (-3.0414501690e+00) * yi[j-3] - (6.9764935070e-01) * yi[j-4];
+			aRxBuffer[j] <<= 4;
+			CALC_YI
+			aTxBufferMini[i] = (uint16_t)yi[j];
 			++j;
-			yi[j] = (1.8862132469e-05) * aRxBuffer[j] + (7.5448529875e-05) * aRxBuffer[j-1] \
-			+ (1.1317279481e-04) * aRxBuffer[j-2] + (7.5448529875e-05) * aRxBuffer[j-3] \
-			+ (1.8862132469e-05) * aRxBuffer[j-4] \
-			- (-3.6404314407e+00) * yi[j-1] - (4.9845340532e+00) * yi[j-2] \
-			- (-3.0414501690e+00) * yi[j-3] - (6.9764935070e-01) * yi[j-4];
+			aRxBuffer[j] <<= 4;
+			CALC_YI
 			++j;
-			yi[j] = (1.8862132469e-05) * aRxBuffer[j] + (7.5448529875e-05) * aRxBuffer[j-1] \
-			+ (1.1317279481e-04) * aRxBuffer[j-2] + (7.5448529875e-05) * aRxBuffer[j-3] \
-			+ (1.8862132469e-05) * aRxBuffer[j-4] \
-			- (-3.6404314407e+00) * yi[j-1] - (4.9845340532e+00) * yi[j-2] \
-			- (-3.0414501690e+00) * yi[j-3] - (6.9764935070e-01) * yi[j-4];
-
+			aRxBuffer[j] <<= 4;
+			CALC_YI
 			aTxBuffer[i] = (uint16_t)yi[j];
 			++j;
 		}
@@ -293,72 +283,60 @@ int main(void) {
 		aRxBuffer[6] = aRxBuffer[j-4];
 
 
-//		wait for the UARTs to finish transferring
+		//		wait for the UARTs to finish transferring
 		while ((USART3->ISR & UART_FLAG_TC) != UART_FLAG_TC) { }
 		while ((USART1->ISR & UART_FLAG_TC) != UART_FLAG_TC) { }
-//		reset the UARTs transfer complete flag
+		//		reset the UARTs transfer complete flag
 		USART3->ICR = UART_CLEAR_TCF;
 		USART1->ICR = UART_CLEAR_TCF;
-//		reset the UART's DMA channels transfer complete and half transfer flags
+		//		reset the UART's DMA channels transfer complete and half transfer flags
 		DMA1->LIFCR = DMA_FLAG_TCIF1_5 | DMA_FLAG_HTIF1_5 | DMA_FLAG_TCIF0_4 | DMA_FLAG_HTIF0_4;
-//		reenable the UART DMA channels
+		//		reenable the UART DMA channels
 		SET_BIT(USART3_DMA_INSTANCE->CR, (DMA_SxCR_EN));
 		SET_BIT(USART1_DMA_INSTANCE->CR, (DMA_SxCR_EN));
-//		start the UARTs DMA transfer
+		//		start the UARTs DMA transfer
 		SET_BIT(USART3->CR3, USART_CR3_DMAT);
 		SET_BIT(USART1->CR3, USART_CR3_DMAT);
 
-//		wait for the first half of the receive buffer to be ready
+		//		wait for the first half of the receive buffer to be ready
 #ifdef USE_BREADBOARD
 		while ((DMA2->LISR & DMA_FLAG_HTIF0_4) != DMA_FLAG_HTIF0_4) {}
 #else
 		while ((DMA2->LISR & DMA_FLAG_HTIF1_5) != DMA_FLAG_HTIF1_5) {}
 #endif
-//		reset the SPI DMA channel half transfer flag
+		//		reset the SPI DMA channel half transfer flag
 		DMA2->LIFCR = DMA_FLAG_HTIF0_4 | DMA_FLAG_HTIF1_5;
-//		the starting index for the recieve buffer is 0
+		//		the starting index for the recieve buffer is 0
 		j = 10;
 		for (int i = 0; i < txCount; ++i) {
-			yi[j] = (1.8862132469e-05) * aRxBuffer[j] + (7.5448529875e-05) * aRxBuffer[j-1] \
-			+ (1.1317279481e-04) * aRxBuffer[j-2] + (7.5448529875e-05) * aRxBuffer[j-3] \
-			+ (1.8862132469e-05) * aRxBuffer[j-4] \
-			- (-3.6404314407e+00) * yi[j-1] - (4.9845340532e+00) * yi[j-2] \
-			- (-3.0414501690e+00) * yi[j-3] - (6.9764935070e-01) * yi[j-4];
+			aRxBuffer[j] <<= 4;
+			CALC_YI
 			++j;
-			yi[j] = (1.8862132469e-05) * aRxBuffer[j] + (7.5448529875e-05) * aRxBuffer[j-1] \
-			+ (1.1317279481e-04) * aRxBuffer[j-2] + (7.5448529875e-05) * aRxBuffer[j-3] \
-			+ (1.8862132469e-05) * aRxBuffer[j-4] \
-			- (-3.6404314407e+00) * yi[j-1] - (4.9845340532e+00) * yi[j-2] \
-			- (-3.0414501690e+00) * yi[j-3] - (6.9764935070e-01) * yi[j-4];
+			aRxBuffer[j] <<= 4;
+			CALC_YI
+			aTxBufferMini[i] = (uint16_t)yi[j];
 			++j;
-			yi[j] = (1.8862132469e-05) * aRxBuffer[j] + (7.5448529875e-05) * aRxBuffer[j-1] \
-			+ (1.1317279481e-04) * aRxBuffer[j-2] + (7.5448529875e-05) * aRxBuffer[j-3] \
-			+ (1.8862132469e-05) * aRxBuffer[j-4] \
-			- (-3.6404314407e+00) * yi[j-1] - (4.9845340532e+00) * yi[j-2] \
-			- (-3.0414501690e+00) * yi[j-3] - (6.9764935070e-01) * yi[j-4];
+			aRxBuffer[j] <<= 4;
+			CALC_YI
 			++j;
-			yi[j] = (1.8862132469e-05) * aRxBuffer[j] + (7.5448529875e-05) * aRxBuffer[j-1] \
-			+ (1.1317279481e-04) * aRxBuffer[j-2] + (7.5448529875e-05) * aRxBuffer[j-3] \
-			+ (1.8862132469e-05) * aRxBuffer[j-4] \
-			- (-3.6404314407e+00) * yi[j-1] - (4.9845340532e+00) * yi[j-2] \
-			- (-3.0414501690e+00) * yi[j-3] - (6.9764935070e-01) * yi[j-4];
-
-			  aTxBuffer[i] = (uint16_t)yi[j];
-				++j;
+			aRxBuffer[j] <<= 4;
+			CALC_YI
+			aTxBuffer[i] = (uint16_t)yi[j];
+			++j;
 		}
 
-//		wait for the UARTs to finish transferring
+		//		wait for the UARTs to finish transferring
 		while ((USART3->ISR & UART_FLAG_TC) != UART_FLAG_TC) {}
 		while ((USART1->ISR & UART_FLAG_TC) != UART_FLAG_TC) {}
-//		clear the transfer complete flag of the UARTs
+		//		clear the transfer complete flag of the UARTs
 		USART3->ICR = UART_CLEAR_TCF;
 		USART1->ICR = UART_CLEAR_TCF;
-//		clear the transfer complete and half transfer flags of the UART DMA channels
+		//		clear the transfer complete and half transfer flags of the UART DMA channels
 		DMA1->LIFCR = DMA_FLAG_TCIF1_5 | DMA_FLAG_HTIF1_5 | DMA_FLAG_TCIF0_4 | DMA_FLAG_HTIF0_4;
-//		enable the UART DMA channels
+		//		enable the UART DMA channels
 		SET_BIT(USART3_DMA_INSTANCE->CR, (DMA_SxCR_EN));
 		SET_BIT(USART1_DMA_INSTANCE->CR, (DMA_SxCR_EN));
-//		start the UART DMA transfers
+		//		start the UART DMA transfers
 		SET_BIT(USART3->CR3, USART_CR3_DMAT);
 		SET_BIT(USART1->CR3, USART_CR3_DMAT);
 	}
@@ -427,49 +405,49 @@ static void MX_SPI1_Init(void) {
 
 	/* SPI1 parameter configuration*/
 	hspi1.Instance = SPI1;
-//	set mode to master
+	//	set mode to master
 	hspi1.Init.Mode = SPI_MODE_MASTER;
-//	recieve only
+	//	recieve only
 	hspi1.Init.Direction = SPI_DIRECTION_2LINES_RXONLY;
-//	14 data bits, which includes the 2 leading 0s
+	//	14 data bits, which includes the 2 leading 0s
 	hspi1.Init.DataSize = SPI_DATASIZE_14BIT;
-//	clock polarity is high
+	//	clock polarity is high
 	hspi1.Init.CLKPolarity = SPI_POLARITY_HIGH;
-//	data is clocked on the first edge
+	//	data is clocked on the first edge
 	hspi1.Init.CLKPhase = SPI_PHASE_1EDGE;
-//	slave select is managed by hardware
+	//	slave select is managed by hardware
 	hspi1.Init.NSS = SPI_NSS_HARD_OUTPUT;
-//	peripheral clock rate is half of pll clock
+	//	peripheral clock rate is half of pll clock
 	hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_2;
-//	MSB transferred first
+	//	MSB transferred first
 	hspi1.Init.FirstBit = SPI_FIRSTBIT_MSB;
-//	not TI mode
+	//	not TI mode
 	hspi1.Init.TIMode = SPI_TIMODE_DISABLE;
-//	no CRC
+	//	no CRC
 	hspi1.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
 	hspi1.Init.CRCPolynomial = 0x0;
 	hspi1.Init.TxCRCInitializationPattern =
 			SPI_CRC_INITIALIZATION_ALL_ZERO_PATTERN;
 	hspi1.Init.RxCRCInitializationPattern =
 			SPI_CRC_INITIALIZATION_ALL_ZERO_PATTERN;
-//	the slave select pin will pulse inactive in between frames
-//	the length of the pulse is 1 cycle
+	//	the slave select pin will pulse inactive in between frames
+	//	the length of the pulse is 1 cycle
 	hspi1.Init.NSSPMode = SPI_NSS_PULSE_ENABLE;
-//	slave select active low
+	//	slave select active low
 	hspi1.Init.NSSPolarity = SPI_NSS_POLARITY_LOW;
-//	request data transfer function after 1 data
+	//	request data transfer function after 1 data
 	hspi1.Init.FifoThreshold = SPI_FIFO_THRESHOLD_01DATA;
-//	no idle time before first transfer
+	//	no idle time before first transfer
 	hspi1.Init.MasterSSIdleness = SPI_MASTER_SS_IDLENESS_00CYCLE;
-//	spend two idle cycles between transfers, the slave select is high for one of these cycles
+	//	spend two idle cycles between transfers, the slave select is high for one of these cycles
 	hspi1.Init.MasterInterDataIdleness = SPI_MASTER_INTERDATA_IDLENESS_02CYCLE;
-//	no auto suspend on overflow
+	//	no auto suspend on overflow
 	hspi1.Init.MasterReceiverAutoSusp = SPI_MASTER_RX_AUTOSUSP_DISABLE;
-//	don't fix IO state
+	//	don't fix IO state
 	hspi1.Init.MasterKeepIOState = SPI_MASTER_KEEP_IO_STATE_DISABLE;
-//	don't swap MISO and MOSI
+	//	don't swap MISO and MOSI
 	hspi1.Init.IOSwap = SPI_IO_SWAP_DISABLE;
-//	initialize SPI with HAL library
+	//	initialize SPI with HAL library
 	if (HAL_SPI_Init(&hspi1) != HAL_OK) {
 		Error_Handler();
 	}
@@ -485,49 +463,49 @@ static void MX_SPI2_Init(void) {
 
 	/* SPI1 parameter configuration*/
 	hspi2.Instance = SPI2;
-//	set mode to master
+	//	set mode to master
 	hspi2.Init.Mode = SPI_MODE_MASTER;
-//	recieve only
+	//	recieve only
 	hspi2.Init.Direction = SPI_DIRECTION_2LINES_RXONLY;
-//	14 data bits, which includes the 2 leading 0s
+	//	14 data bits, which includes the 2 leading 0s
 	hspi2.Init.DataSize = SPI_DATASIZE_14BIT;
-//	clock polarity is high
+	//	clock polarity is high
 	hspi2.Init.CLKPolarity = SPI_POLARITY_HIGH;
-//	data is clocked on the first edge
+	//	data is clocked on the first edge
 	hspi2.Init.CLKPhase = SPI_PHASE_1EDGE;
-//	slave select is managed by hardware
+	//	slave select is managed by hardware
 	hspi2.Init.NSS = SPI_NSS_HARD_OUTPUT;
-//	peripheral clock rate is half of pll clock
+	//	peripheral clock rate is half of pll clock
 	hspi2.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_2;
-//	MSB transferred first
+	//	MSB transferred first
 	hspi2.Init.FirstBit = SPI_FIRSTBIT_MSB;
-//	not TI mode
+	//	not TI mode
 	hspi2.Init.TIMode = SPI_TIMODE_DISABLE;
-//	no CRC
+	//	no CRC
 	hspi2.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
 	hspi2.Init.CRCPolynomial = 0x0;
 	hspi2.Init.TxCRCInitializationPattern =
 			SPI_CRC_INITIALIZATION_ALL_ZERO_PATTERN;
 	hspi2.Init.RxCRCInitializationPattern =
 			SPI_CRC_INITIALIZATION_ALL_ZERO_PATTERN;
-//	the slave select pin will pulse inactive in between frames
-//	the length of the pulse is 1 cycle
+	//	the slave select pin will pulse inactive in between frames
+	//	the length of the pulse is 1 cycle
 	hspi2.Init.NSSPMode = SPI_NSS_PULSE_ENABLE;
-//	slave select active low
+	//	slave select active low
 	hspi2.Init.NSSPolarity = SPI_NSS_POLARITY_LOW;
-//	request data transfer function after 1 data
+	//	request data transfer function after 1 data
 	hspi2.Init.FifoThreshold = SPI_FIFO_THRESHOLD_01DATA;
-//	no idle time before first transfer
+	//	no idle time before first transfer
 	hspi2.Init.MasterSSIdleness = SPI_MASTER_SS_IDLENESS_00CYCLE;
-//	spend two idle cycles between transfers, the slave select is high for one of these cycles
+	//	spend two idle cycles between transfers, the slave select is high for one of these cycles
 	hspi2.Init.MasterInterDataIdleness = SPI_MASTER_INTERDATA_IDLENESS_02CYCLE;
-//	no auto suspend on overflow
+	//	no auto suspend on overflow
 	hspi2.Init.MasterReceiverAutoSusp = SPI_MASTER_RX_AUTOSUSP_DISABLE;
-//	don't fix IO state
+	//	don't fix IO state
 	hspi2.Init.MasterKeepIOState = SPI_MASTER_KEEP_IO_STATE_DISABLE;
-//	don't swap MISO and MOSI
+	//	don't swap MISO and MOSI
 	hspi2.Init.IOSwap = SPI_IO_SWAP_DISABLE;
-//	initialize SPI with HAL library
+	//	initialize SPI with HAL library
 	if (HAL_SPI_Init(&hspi2) != HAL_OK) {
 		Error_Handler();
 	}
@@ -542,40 +520,40 @@ static void MX_SPI2_Init(void) {
 static void MX_USART1_UART_Init(void) {
 
 	huart1.Instance = USART1;
-//	baud rate is peripheral clock divided by 8, check the ioc file
+	//	baud rate is peripheral clock divided by 8, check the ioc file
 	huart1.Init.BaudRate = 11978688;
-//	8 bits per word
+	//	8 bits per word
 	huart1.Init.WordLength = UART_WORDLENGTH_8B;
-//	1 stop bit
+	//	1 stop bit
 	huart1.Init.StopBits = UART_STOPBITS_1;
-//	no parity check
+	//	no parity check
 	huart1.Init.Parity = UART_PARITY_NONE;
-//	UART in both transmit and receive
+	//	UART in both transmit and receive
 	huart1.Init.Mode = UART_MODE_TX_RX;
-//	no HW flow control
+	//	no HW flow control
 	huart1.Init.HwFlowCtl = UART_HWCONTROL_NONE;
-//	oversample by 8
+	//	oversample by 8
 	huart1.Init.OverSampling = UART_OVERSAMPLING_8;
 	huart1.Init.OneBitSampling = UART_ONE_BIT_SAMPLE_DISABLE;
-//	divide the peripheral clock by 1
+	//	divide the peripheral clock by 1
 	huart1.Init.ClockPrescaler = UART_PRESCALER_DIV1;
-//	no advanced features
+	//	no advanced features
 	huart1.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_NO_INIT;
-//	initialize peripheral with HAL library
+	//	initialize peripheral with HAL library
 	if (HAL_UART_Init(&huart1) != HAL_OK) {
 		Error_Handler();
 	}
-//	initialize transfer fifo
+	//	initialize transfer fifo
 	if (HAL_UARTEx_SetTxFifoThreshold(&huart1, UART_TXFIFO_THRESHOLD_1_8)
 			!= HAL_OK) {
 		Error_Handler();
 	}
-//	initialize receive fifo
+	//	initialize receive fifo
 	if (HAL_UARTEx_SetRxFifoThreshold(&huart1, UART_RXFIFO_THRESHOLD_1_8)
 			!= HAL_OK) {
 		Error_Handler();
 	}
-//	enable fifo
+	//	enable fifo
 	if (HAL_UARTEx_EnableFifoMode(&huart1) != HAL_OK) {
 		Error_Handler();
 	}
@@ -592,44 +570,44 @@ static void MX_USART3_UART_Init(void) {
 
 	huart3.Instance = USART3;
 	//	baud rate is peripheral clock divided by 8, check the ioc file
-		huart3.Init.BaudRate = 11978688;
+	huart3.Init.BaudRate = 11978688;
 	//	8 bits per word
-		huart3.Init.WordLength = UART_WORDLENGTH_8B;
+	huart3.Init.WordLength = UART_WORDLENGTH_8B;
 	//	1 stop bit
-		huart3.Init.StopBits = UART_STOPBITS_1;
+	huart3.Init.StopBits = UART_STOPBITS_1;
 	//	no parity check
-		huart3.Init.Parity = UART_PARITY_NONE;
+	huart3.Init.Parity = UART_PARITY_NONE;
 	//	UART in both transmit and receive
-		huart3.Init.Mode = UART_MODE_TX_RX;
+	huart3.Init.Mode = UART_MODE_TX_RX;
 	//	no HW flow control
-		huart3.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+	huart3.Init.HwFlowCtl = UART_HWCONTROL_NONE;
 	//	oversample by 8
-		huart3.Init.OverSampling = UART_OVERSAMPLING_8;
-		huart3.Init.OneBitSampling = UART_ONE_BIT_SAMPLE_DISABLE;
+	huart3.Init.OverSampling = UART_OVERSAMPLING_8;
+	huart3.Init.OneBitSampling = UART_ONE_BIT_SAMPLE_DISABLE;
 	//	divide the peripheral clock by 1
-		huart3.Init.ClockPrescaler = UART_PRESCALER_DIV1;
+	huart3.Init.ClockPrescaler = UART_PRESCALER_DIV1;
 	//	no advanced features
-		huart3.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_NO_INIT;
+	huart3.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_NO_INIT;
 	//	initialize peripheral with HAL library
-		if (HAL_UART_Init(&huart3) != HAL_OK) {
-			Error_Handler();
-		}
+	if (HAL_UART_Init(&huart3) != HAL_OK) {
+		Error_Handler();
+	}
 	//	initialize transfer fifo
-		if (HAL_UARTEx_SetTxFifoThreshold(&huart3, UART_TXFIFO_THRESHOLD_1_8)
-				!= HAL_OK) {
-			Error_Handler();
-		}
+	if (HAL_UARTEx_SetTxFifoThreshold(&huart3, UART_TXFIFO_THRESHOLD_1_8)
+			!= HAL_OK) {
+		Error_Handler();
+	}
 	//	initialize receive fifo
-		if (HAL_UARTEx_SetRxFifoThreshold(&huart3, UART_RXFIFO_THRESHOLD_1_8)
-				!= HAL_OK) {
-			Error_Handler();
-		}
+	if (HAL_UARTEx_SetRxFifoThreshold(&huart3, UART_RXFIFO_THRESHOLD_1_8)
+			!= HAL_OK) {
+		Error_Handler();
+	}
 	//	enable fifo
-		if (HAL_UARTEx_EnableFifoMode(&huart3) != HAL_OK) {
-			Error_Handler();
-		}
-		HAL_NVIC_SetPriority(USART3_IRQn, 0, 1);
-		HAL_NVIC_EnableIRQ(USART3_IRQn);
+	if (HAL_UARTEx_EnableFifoMode(&huart3) != HAL_OK) {
+		Error_Handler();
+	}
+	HAL_NVIC_SetPriority(USART3_IRQn, 0, 1);
+	HAL_NVIC_EnableIRQ(USART3_IRQn);
 }
 
 /**
@@ -764,9 +742,11 @@ void HAL_UART_ErrorCallback(UART_HandleTypeDef *UartHandle) {
  * @retval None
  */
 void Error_Handler(void) {
-//	disable interrupts
+//	resume systick for HAL_Delay function
+	HAL_ResumeTick();
+	//	disable interrupts
 	__disable_irq();
-//	toggle the red LED forever
+	//	toggle the red LED forever
 	while (1) {
 		BSP_LED_Toggle(LED3);
 		HAL_Delay(100);
