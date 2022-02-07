@@ -71,13 +71,23 @@ float yi[8202] = { 0 };
 
 // The oversampling ratio
 #define OVERSAMPLING 4
-
-#define CALC_YI yi[j] = (8.9938621343e-04) * aRxBuffer[j] + (2.6981586403e-03) * aRxBuffer[j-1] \
-		+ (2.6981586403e-03) * aRxBuffer[j-2] + (8.9938621343e-04) * aRxBuffer[j-3] \
-		- (-2.5885576576e+00) * yi[j-1] - (2.2574907505e+00) * yi[j-2] \
-		- (-6.6173800320e-01) * yi[j-3];
-
 //#define USE_BREADBOARD
+
+// 75 kHz cutoff
+#define CALC_YI yi[j] = (8.9938621343e-04) * aRxBuffer[j] + (2.6981586403e-03) * aRxBuffer[j-1] \
++ (2.6981586403e-03) * aRxBuffer[j-2] + (8.9938621343e-04) * aRxBuffer[j-3] \
+- (-2.5885576576e+00) * yi[j-1] - (2.2574907505e+00) * yi[j-2] \
+- (-6.6173800320e-01) * yi[j-3];
+// 2 prescaler for wideband applications
+#define SPIPRESCALER SPI_BAUDRATEPRESCALER_2
+
+// 1.1 MHz cutoff
+#define CALC_YI yi[j] = (2.8777003368e-01) * aRxBuffer[j] + (8.6331010103e-01) * aRxBuffer[j-1] \
++ (8.6331010103e-01) * aRxBuffer[j-2] + (2.8777003368e-01) * aRxBuffer[j-3] \
+- (7.4507884912e-01) * yi[j-1] - (4.8107590347e-01) * yi[j-2] \
+- (7.6005516819e-02) * yi[j-3];
+// 32 prescaler for capturing audio
+#define SPIPRESCALER SPI_BAUDRATEPRESCALER_32
 
 /**
  * @brief  The application entry point.
@@ -124,6 +134,12 @@ int main(void) {
 	//	initialize URT3, going to the STLINK interface
 	MX_USART3_UART_Init();
 
+	// turn on LED 6 if we are in slow mode
+	if( SPIPRESCALER == SPI_BAUDRATEPRESCALER_32 ){
+		// turn on LED 6
+		GPIOE->BSRR = GPIO_PIN_0 << 16;
+	}
+
 	//	initialize SPI1 interface, going to the breadboard converter
 	MX_SPI1_Init();
 	//	initialize the SPI2 interface, going to the pcb converter
@@ -154,7 +170,7 @@ int main(void) {
 	SET_BIT(SPI2_DMA_INSTANCE->CR, DMA_IT_TC | DMA_IT_HT);
 
 #ifdef USE_BREADBOARD
-	start the DMA transfer on SPI1, use HAL library to perform initial configurations
+//	start the DMA transfer on SPI1, use HAL library to perform initial configurations
 	if (HAL_DMA_Start(hspi1.hdmarx, (uint32_t) &hspi1.Instance->RXDR,
 			(uint32_t) aRxBuffer + 20, rxCount) != HAL_OK) {
 		Error_Handler();
@@ -418,7 +434,7 @@ static void MX_SPI1_Init(void) {
 	//	slave select is managed by hardware
 	hspi1.Init.NSS = SPI_NSS_HARD_OUTPUT;
 	//	peripheral clock rate is half of pll clock
-	hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_2;
+	hspi1.Init.BaudRatePrescaler = SPIPRESCALER;
 	//	MSB transferred first
 	hspi1.Init.FirstBit = SPI_FIRSTBIT_MSB;
 	//	not TI mode
@@ -476,7 +492,7 @@ static void MX_SPI2_Init(void) {
 	//	slave select is managed by hardware
 	hspi2.Init.NSS = SPI_NSS_HARD_OUTPUT;
 	//	peripheral clock rate is half of pll clock
-	hspi2.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_2;
+	hspi2.Init.BaudRatePrescaler = SPIPRESCALER;
 	//	MSB transferred first
 	hspi2.Init.FirstBit = SPI_FIRSTBIT_MSB;
 	//	not TI mode
