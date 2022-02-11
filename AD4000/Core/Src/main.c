@@ -66,7 +66,7 @@ ALIGN_32BYTES (__IO uint16_t aTxBuffer[1024]) = {0};
 ALIGN_32BYTES (__IO uint16_t aTxBufferMini[1024]) = {0};
 // buffer used to receive data over SPI
 ALIGN_32BYTES (__IO uint16_t aRxBuffer[8202]) = {0};
-// array to store output values of iir filter, not currently implimented
+// array to store output values of iir filter
 float yi[8202] = { 0 };
 
 // The oversampling ratio
@@ -86,8 +86,8 @@ float yi[8202] = { 0 };
 + (8.6331010103e-01) * aRxBuffer[j-2] + (2.8777003368e-01) * aRxBuffer[j-3] \
 - (7.4507884912e-01) * yi[j-1] - (4.8107590347e-01) * yi[j-2] \
 - (7.6005516819e-02) * yi[j-3];
-// 32 prescaler for capturing audio
-#define SPIPRESCALER SPI_BAUDRATEPRESCALER_32
+// 16 prescaler for capturing audio
+#define SPIPRESCALER SPI_BAUDRATEPRESCALER_16
 
 /**
  * @brief  The application entry point.
