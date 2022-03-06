@@ -69,19 +69,19 @@ ALIGN_32BYTES (__IO uint16_t aRxBuffer[16394]) = {0};
 // array to store output values of iir filter
 float yi[16394] = { 0 };
 
-// The oversampling ratio
-#define OVERSAMPLING 4
 //#define USE_BREADBOARD
 
-// 0.068 Hz digital cuttoff frequency (75 kHz at 2.2 MS/s)
 
+// uses 0.068 Hz digital cuttoff frequency (75 kHz at 2.2 MS/s)
 // 2 prescaler for wideband applications
 #define SPIPRESCALER SPI_BAUDRATEPRESCALER_2
 
-// 1.0 Hz digital cuttoff frequendy (137 kHz at 275 kS/s)
-
-//// 16 prescaler for capturing audio
-//#define SPIPRESCALER SPI_BAUDRATEPRESCALER_16
+// uses 1.0 Hz digital cuttoff frequendy (137 kHz at 275 kS/s)
+#define AUDIO_APPLICATION
+// 16 prescaler for capturing audio
+#ifdef AUDIO_APPLICATION
+#define SPIPRESCALER SPI_BAUDRATEPRESCALER_16
+#endif
 
 /**
  * @brief  The application entry point.
@@ -265,6 +265,20 @@ int main(void) {
 		DMA2->LIFCR = DMA_FLAG_TCIF0_4 | DMA_FLAG_TCIF1_5;
 		//		the rx buffer index starts at half way through the buffer and goes to the end
 		for (int i = 0; i < txCount; ++i, j += 4) {
+#ifdef AUDIO_APPLICATION
+			yi[j] = (3.1094295479e+00) * aRxBuffer[j] + (1.2437718192e+01) * aRxBuffer[j-1] \
+			+ (1.8656577288e+01) * aRxBuffer[j-2] + (1.2437718192e+01) * aRxBuffer[j-3] \
+			+ (3.1094295479e+00) * aRxBuffer[j-4] \
+			- (1.0089442852e+00) * yi[j-1] - (8.0948945161e-01) * yi[j-2] \
+			- (2.5187845872e-01) * yi[j-3] - (3.9117352402e-02) * yi[j-4];
+
+			yi[j+1] = (3.1094295479e+00) * aRxBuffer[j+1] + (1.2437718192e+01) * aRxBuffer[j] \
+			+ (1.8656577288e+01) * aRxBuffer[j-1] + (1.2437718192e+01) * aRxBuffer[j-2] \
+			+ (3.1094295479e+00) * aRxBuffer[j-3] \
+			- (1.0089442852e+00) * yi[j] - (8.0948945161e-01) * yi[j-1] \
+			- (2.5187845872e-01) * yi[j-2] - (3.9117352402e-02) * yi[j-3];
+
+#else
 			yi[j] = (1.3966271402e-03) * aRxBuffer[j] + (5.5865085610e-03) * aRxBuffer[j-1] \
 			+ (8.3797628414e-03) * aRxBuffer[j-2] + (5.5865085610e-03) * aRxBuffer[j-3] \
 			+ (1.3966271402e-03) * aRxBuffer[j-4] \
@@ -276,9 +290,23 @@ int main(void) {
 			+ (1.3966271402e-03) * aRxBuffer[j-3] \
 			- (-3.4619568098e+00) * yi[j] - (4.5259279173e+00) * yi[j-1] \
 			- (-2.6455449224e+00) * yi[j-2] - (5.8297044197e-01) * yi[j-3];
+#endif
 
 			aTxBufferMini[i] = (uint16_t)yi[j+1];
 
+#ifdef AUDIO_APPLICATION
+			yi[j+2] = (3.1094295479e+00) * aRxBuffer[j+2] + (1.2437718192e+01) * aRxBuffer[j+1] \
+			+ (1.8656577288e+01) * aRxBuffer[j] + (1.2437718192e+01) * aRxBuffer[j-1] \
+			+ (3.1094295479e+00) * aRxBuffer[j-2] \
+			- (1.0089442852e+00) * yi[j+1] - (8.0948945161e-01) * yi[j] \
+			- (2.5187845872e-01) * yi[j-1] - (3.9117352402e-02) * yi[j-2];
+
+			yi[j+3] = (3.1094295479e+00) * aRxBuffer[j+3] + (1.2437718192e+01) * aRxBuffer[j+2] \
+			+ (1.8656577288e+01) * aRxBuffer[j+1] + (1.2437718192e+01) * aRxBuffer[j] \
+			+ (3.1094295479e+00) * aRxBuffer[j-1] \
+			- (1.0089442852e+00) * yi[j+2] - (8.0948945161e-01) * yi[j+1] \
+			- (2.5187845872e-01) * yi[j] - (3.9117352402e-02) * yi[j-1];
+#else
 			yi[j+2] = (1.3966271402e-03) * aRxBuffer[j+2] + (5.5865085610e-03) * aRxBuffer[j+1] \
 			+ (8.3797628414e-03) * aRxBuffer[j] + (5.5865085610e-03) * aRxBuffer[j-1] \
 			+ (1.3966271402e-03) * aRxBuffer[j-2] \
@@ -290,6 +318,7 @@ int main(void) {
 			+ (1.3966271402e-03) * aRxBuffer[j-1] \
 			- (-3.4619568098e+00) * yi[j+2] - (4.5259279173e+00) * yi[j+1] \
 			- (-2.6455449224e+00) * yi[j] - (5.8297044197e-01) * yi[j-1];
+#endif
 
 			aTxBuffer[i] = (uint16_t)yi[j+3];
 		}
@@ -302,7 +331,6 @@ int main(void) {
 		aRxBuffer[7] = aRxBuffer[16391];
 		yi[6] = yi[16390];
 		aRxBuffer[6] = aRxBuffer[16390];
-
 
 		//		wait for the UARTs to finish transferring
 		while ((USART3->ISR & UART_FLAG_TC) != UART_FLAG_TC) { }
@@ -323,13 +351,27 @@ int main(void) {
 #ifdef USE_BREADBOARD
 		while ((DMA2->LISR & DMA_FLAG_HTIF0_4) != DMA_FLAG_HTIF0_4) {}
 #else
-		while ((DMA2->LISR & DMA_FLAG_HTIF1_5) != DMA_FLAG_HTIF1_5) {GPIOE->BSRR = GPIO_PIN_0 << 16;}
+		while ((DMA2->LISR & DMA_FLAG_HTIF1_5) != DMA_FLAG_HTIF1_5) {}
 #endif
 		//		reset the SPI DMA channel half transfer flag
 		DMA2->LIFCR = DMA_FLAG_HTIF0_4 | DMA_FLAG_HTIF1_5;
 		//		the starting index for the recieve buffer is 0
 		j = 10;
 		for (int i = 0; i < txCount; ++i, j += 4) {
+#ifdef AUDIO_APPLICATION
+			yi[j] = (3.1094295479e+00) * aRxBuffer[j] + (1.2437718192e+01) * aRxBuffer[j-1] \
+			+ (1.8656577288e+01) * aRxBuffer[j-2] + (1.2437718192e+01) * aRxBuffer[j-3] \
+			+ (3.1094295479e+00) * aRxBuffer[j-4] \
+			- (1.0089442852e+00) * yi[j-1] - (8.0948945161e-01) * yi[j-2] \
+			- (2.5187845872e-01) * yi[j-3] - (3.9117352402e-02) * yi[j-4];
+
+			yi[j+1] = (3.1094295479e+00) * aRxBuffer[j+1] + (1.2437718192e+01) * aRxBuffer[j] \
+			+ (1.8656577288e+01) * aRxBuffer[j-1] + (1.2437718192e+01) * aRxBuffer[j-2] \
+			+ (3.1094295479e+00) * aRxBuffer[j-3] \
+			- (1.0089442852e+00) * yi[j] - (8.0948945161e-01) * yi[j-1] \
+			- (2.5187845872e-01) * yi[j-2] - (3.9117352402e-02) * yi[j-3];
+
+#else
 			yi[j] = (1.3966271402e-03) * aRxBuffer[j] + (5.5865085610e-03) * aRxBuffer[j-1] \
 			+ (8.3797628414e-03) * aRxBuffer[j-2] + (5.5865085610e-03) * aRxBuffer[j-3] \
 			+ (1.3966271402e-03) * aRxBuffer[j-4] \
@@ -341,9 +383,23 @@ int main(void) {
 			+ (1.3966271402e-03) * aRxBuffer[j-3] \
 			- (-3.4619568098e+00) * yi[j] - (4.5259279173e+00) * yi[j-1] \
 			- (-2.6455449224e+00) * yi[j-2] - (5.8297044197e-01) * yi[j-3];
+#endif
 
 			aTxBufferMini[i] = (uint16_t)yi[j+1];
 
+#ifdef AUDIO_APPLICATION
+			yi[j+2] = (3.1094295479e+00) * aRxBuffer[j+2] + (1.2437718192e+01) * aRxBuffer[j+1] \
+			+ (1.8656577288e+01) * aRxBuffer[j] + (1.2437718192e+01) * aRxBuffer[j-1] \
+			+ (3.1094295479e+00) * aRxBuffer[j-2] \
+			- (1.0089442852e+00) * yi[j+1] - (8.0948945161e-01) * yi[j] \
+			- (2.5187845872e-01) * yi[j-1] - (3.9117352402e-02) * yi[j-2];
+
+			yi[j+3] = (3.1094295479e+00) * aRxBuffer[j+3] + (1.2437718192e+01) * aRxBuffer[j+2] \
+			+ (1.8656577288e+01) * aRxBuffer[j+1] + (1.2437718192e+01) * aRxBuffer[j] \
+			+ (3.1094295479e+00) * aRxBuffer[j-1] \
+			- (1.0089442852e+00) * yi[j+2] - (8.0948945161e-01) * yi[j+1] \
+			- (2.5187845872e-01) * yi[j] - (3.9117352402e-02) * yi[j-1];
+#else
 			yi[j+2] = (1.3966271402e-03) * aRxBuffer[j+2] + (5.5865085610e-03) * aRxBuffer[j+1] \
 			+ (8.3797628414e-03) * aRxBuffer[j] + (5.5865085610e-03) * aRxBuffer[j-1] \
 			+ (1.3966271402e-03) * aRxBuffer[j-2] \
@@ -355,6 +411,7 @@ int main(void) {
 			+ (1.3966271402e-03) * aRxBuffer[j-1] \
 			- (-3.4619568098e+00) * yi[j+2] - (4.5259279173e+00) * yi[j+1] \
 			- (-2.6455449224e+00) * yi[j] - (5.8297044197e-01) * yi[j-1];
+#endif
 
 			aTxBuffer[i] = (uint16_t)yi[j+3];
 		}
