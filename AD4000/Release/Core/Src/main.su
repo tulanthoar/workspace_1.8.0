@@ -1,7 +1,7 @@
-main.c:737:6:tx_h_complete	0	static
-main.c:730:6:HAL_GPIO_EXTI_Callback	0	static
-main.c:762:6:Error_Handler	8	static,ignoring_inline_asm
-main.c:367:6:SystemClock_Config	120	static
-main.c:98:5:main	120	static,ignoring_inline_asm
-main.c:748:6:HAL_SPI_ErrorCallback	8	static
-main.c:753:6:HAL_UART_ErrorCallback	8	static
+main.c:747:6:tx_h_complete	0	static
+main.c:740:6:HAL_GPIO_EXTI_Callback	0	static
+main.c:772:6:Error_Handler	8	static,ignoring_inline_asm
+main.c:377:6:SystemClock_Config	136	static
+main.c:90:5:main	168	static,ignoring_inline_asm
+main.c:758:6:HAL_SPI_ErrorCallback	8	static
+main.c:763:6:HAL_UART_ErrorCallback	8	static
