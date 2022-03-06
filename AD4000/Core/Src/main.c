@@ -61,33 +61,27 @@ __IO uint32_t wTransferState = TRANSFER_WAIT;
 // the value of this variable is toggled when the user button is pressed
 __IO uint32_t UserButtonStatus = 0;
 // buffer used to transmit data over board UART
-ALIGN_32BYTES (__IO uint16_t aTxBuffer[1024]) = {0};
+ALIGN_32BYTES (__IO uint16_t aTxBuffer[2048]) = {0};
 // buffer used to transmit data over stlink mini UART
-ALIGN_32BYTES (__IO uint16_t aTxBufferMini[1024]) = {0};
+ALIGN_32BYTES (__IO uint16_t aTxBufferMini[2048]) = {0};
 // buffer used to receive data over SPI
-ALIGN_32BYTES (__IO uint16_t aRxBuffer[8202]) = {0};
+ALIGN_32BYTES (__IO uint16_t aRxBuffer[16394]) = {0};
 // array to store output values of iir filter
-float yi[8202] = { 0 };
+float yi[16394] = { 0 };
 
 // The oversampling ratio
 #define OVERSAMPLING 4
 //#define USE_BREADBOARD
 
-// 75 kHz cutoff
-#define CALC_YI yi[j] = (8.9938621343e-04) * aRxBuffer[j] + (2.6981586403e-03) * aRxBuffer[j-1] \
-+ (2.6981586403e-03) * aRxBuffer[j-2] + (8.9938621343e-04) * aRxBuffer[j-3] \
-- (-2.5885576576e+00) * yi[j-1] - (2.2574907505e+00) * yi[j-2] \
-- (-6.6173800320e-01) * yi[j-3];
+// 0.068 Hz digital cuttoff frequency (75 kHz at 2.2 MS/s)
+
 // 2 prescaler for wideband applications
 #define SPIPRESCALER SPI_BAUDRATEPRESCALER_2
 
-// 1.1 MHz cutoff
-#define CALC_YI yi[j] = (2.8777003368e-01) * aRxBuffer[j] + (8.6331010103e-01) * aRxBuffer[j-1] \
-+ (8.6331010103e-01) * aRxBuffer[j-2] + (2.8777003368e-01) * aRxBuffer[j-3] \
-- (7.4507884912e-01) * yi[j-1] - (4.8107590347e-01) * yi[j-2] \
-- (7.6005516819e-02) * yi[j-3];
-// 16 prescaler for capturing audio
-#define SPIPRESCALER SPI_BAUDRATEPRESCALER_16
+// 1.0 Hz digital cuttoff frequendy (137 kHz at 275 kS/s)
+
+//// 16 prescaler for capturing audio
+//#define SPIPRESCALER SPI_BAUDRATEPRESCALER_16
 
 /**
  * @brief  The application entry point.
@@ -135,7 +129,7 @@ int main(void) {
 	MX_USART3_UART_Init();
 
 	// turn on LED 6 if we are in slow mode
-	if( SPIPRESCALER == SPI_BAUDRATEPRESCALER_32 ){
+	if( SPIPRESCALER == SPI_BAUDRATEPRESCALER_16 ){
 		// turn on LED 6
 		GPIOE->BSRR = GPIO_PIN_0 << 16;
 	}
@@ -221,12 +215,9 @@ int main(void) {
 	//	transfer data from rxbuffer to tx buffer
 	//	j is the index for the rx buffer
 	int j = 10;
-	aTxBuffer[0] = aRxBuffer[j] << 4;
-	aTxBufferMini[0] = aTxBuffer[0];
 	//	i is the index of the tx buffer
-	//	j increases by the oversampling ratio for each inciment in i
-	for (int i = 1; i < txCount; ++i) {
-		j += OVERSAMPLING;
+	//	j increases by the oversampling ratio for each increment in i
+	for (int i = 0; i < txCount; ++i, j += 4) {
 		aTxBuffer[i] = aRxBuffer[j] << 4;
 		aTxBufferMini[i] = aTxBuffer[i];
 	}
@@ -273,30 +264,42 @@ int main(void) {
 		//		clear the transfer complete flag of the SPI channel
 		DMA2->LIFCR = DMA_FLAG_TCIF0_4 | DMA_FLAG_TCIF1_5;
 		//		the rx buffer index starts at half way through the buffer and goes to the end
-		for (int i = 0; i < txCount; ++i) {
-			aRxBuffer[j] <<= 4;
-			CALC_YI
-			++j;
-			aRxBuffer[j] <<= 4;
-			CALC_YI
-			aTxBufferMini[i] = (uint16_t)yi[j];
-			++j;
-			aRxBuffer[j] <<= 4;
-			CALC_YI
-			++j;
-			aRxBuffer[j] <<= 4;
-			CALC_YI
-			aTxBuffer[i] = (uint16_t)yi[j];
-			++j;
+		for (int i = 0; i < txCount; ++i, j += 4) {
+			yi[j] = (1.4390179415e-02) * aRxBuffer[j] + (4.3170538245e-02) * aRxBuffer[j-1] \
+			+ (4.3170538245e-02) * aRxBuffer[j-2] + (1.4390179415e-02) * aRxBuffer[j-3] \
+			- (-2.5885576576e+00) * yi[j-1] - (2.2574907505e+00) * yi[j-2] \
+			- (-6.6173800320e-01) * yi[j-3];
+
+			yi[j+1] = (1.4390179415e-02) * aRxBuffer[j+1] + (4.3170538245e-02) * aRxBuffer[j] \
+			+ (4.3170538245e-02) * aRxBuffer[j-1] + (1.4390179415e-02) * aRxBuffer[j-2] \
+			- (-2.5885576576e+00) * yi[j] - (2.2574907505e+00) * yi[j-1] \
+			- (-6.6173800320e-01) * yi[j-2];
+
+			aTxBufferMini[i] = (uint16_t)yi[j+1];
+
+			yi[j+2] = (1.4390179415e-02) * aRxBuffer[j+2] + (4.3170538245e-02) * aRxBuffer[j+1] \
+			+ (4.3170538245e-02) * aRxBuffer[j] + (1.4390179415e-02) * aRxBuffer[j-1] \
+			- (-2.5885576576e+00) * yi[j+1] - (2.2574907505e+00) * yi[j] \
+			- (-6.6173800320e-01) * yi[j-1];
+
+			yi[j+3] = (1.4390179415e-02) * aRxBuffer[j+3] + (4.3170538245e-02) * aRxBuffer[j+2] \
+			+ (4.3170538245e-02) * aRxBuffer[j+1] + (1.4390179415e-02) * aRxBuffer[j] \
+			- (-2.5885576576e+00) * yi[j+2] - (2.2574907505e+00) * yi[j+1] \
+			- (-6.6173800320e-01) * yi[j];
+
+			aTxBuffer[i] = (uint16_t)yi[j+3];
 		}
-		yi[9] = yi[j-1];
-		aRxBuffer[9] = aRxBuffer[j-1];
-		yi[8] = yi[j-2];
-		aRxBuffer[8] = aRxBuffer[j-2];
-		yi[7] = yi[j-3];
-		aRxBuffer[7] = aRxBuffer[j-3];
-		yi[6] = yi[j-4];
-		aRxBuffer[6] = aRxBuffer[j-4];
+
+		yi[9] = yi[16393];
+		aRxBuffer[9] = aRxBuffer[16393];
+		yi[8] = yi[16392];
+		aRxBuffer[8] = aRxBuffer[16392];
+		yi[7] = yi[16391];
+		aRxBuffer[7] = aRxBuffer[16391];
+		yi[6] = yi[16390];
+		aRxBuffer[6] = aRxBuffer[16390];
+		yi[5] = yi[16389];
+		aRxBuffer[5] = aRxBuffer[16389];
 
 
 		//		wait for the UARTs to finish transferring
@@ -324,21 +327,30 @@ int main(void) {
 		DMA2->LIFCR = DMA_FLAG_HTIF0_4 | DMA_FLAG_HTIF1_5;
 		//		the starting index for the recieve buffer is 0
 		j = 10;
-		for (int i = 0; i < txCount; ++i) {
-			aRxBuffer[j] <<= 4;
-			CALC_YI
-			++j;
-			aRxBuffer[j] <<= 4;
-			CALC_YI
-			aTxBufferMini[i] = (uint16_t)yi[j];
-			++j;
-			aRxBuffer[j] <<= 4;
-			CALC_YI
-			++j;
-			aRxBuffer[j] <<= 4;
-			CALC_YI
-			aTxBuffer[i] = (uint16_t)yi[j];
-			++j;
+		for (int i = 0; i < txCount; ++i, j += 4) {
+			yi[j] = (1.4390179415e-02) * aRxBuffer[j] + (4.3170538245e-02) * aRxBuffer[j-1] \
+			+ (4.3170538245e-02) * aRxBuffer[j-2] + (1.4390179415e-02) * aRxBuffer[j-3] \
+			- (-2.5885576576e+00) * yi[j-1] - (2.2574907505e+00) * yi[j-2] \
+			- (-6.6173800320e-01) * yi[j-3];
+
+			yi[j+1] = (1.4390179415e-02) * aRxBuffer[j+1] + (4.3170538245e-02) * aRxBuffer[j] \
+			+ (4.3170538245e-02) * aRxBuffer[j-1] + (1.4390179415e-02) * aRxBuffer[j-2] \
+			- (-2.5885576576e+00) * yi[j] - (2.2574907505e+00) * yi[j-1] \
+			- (-6.6173800320e-01) * yi[j-2];
+
+			aTxBufferMini[i] = (uint16_t)yi[j+1];
+
+			yi[j+2] = (1.4390179415e-02) * aRxBuffer[j+2] + (4.3170538245e-02) * aRxBuffer[j+1] \
+			+ (4.3170538245e-02) * aRxBuffer[j] + (1.4390179415e-02) * aRxBuffer[j-1] \
+			- (-2.5885576576e+00) * yi[j+1] - (2.2574907505e+00) * yi[j] \
+			- (-6.6173800320e-01) * yi[j-1];
+
+			yi[j+3] = (1.4390179415e-02) * aRxBuffer[j+3] + (4.3170538245e-02) * aRxBuffer[j+2] \
+			+ (4.3170538245e-02) * aRxBuffer[j+1] + (1.4390179415e-02) * aRxBuffer[j] \
+			- (-2.5885576576e+00) * yi[j+2] - (2.2574907505e+00) * yi[j+1] \
+			- (-6.6173800320e-01) * yi[j];
+
+			aTxBuffer[i] = (uint16_t)yi[j+3];
 		}
 
 		//		wait for the UARTs to finish transferring
